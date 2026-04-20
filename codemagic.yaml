@@ -1,0 +1,124 @@
+workflows:
+  android-workflow:
+    name: Ignite Android Build (APK)
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      flutter: 3.41.6
+      java: 17
+    # triggering:
+    #   events:
+    #     - push
+    #   branch_patterns:
+    #     - pattern: main
+    #       include: true
+    #       source: true
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          flutter packages pub get
+      - name: Flutter build APK
+        script: |
+          flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+    publishing:
+      email:
+        recipients:
+          - levanhuy96@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  ios-workflow:
+    name: Ignite iOS Build (IPA)
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    environment:
+      vars:
+        BUNDLE_ID: "com.example.codemagic"
+      flutter: 3.41.6
+      xcode: latest
+    # triggering:
+    #   events:
+    #     - push
+    #   branch_patterns:
+    #     - pattern: main
+    #       include: true
+    #       source: true
+    scripts:
+      - name: Disable code signing completely
+        script: |
+          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
+
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ" 2>/dev/null || \
+          sed -i 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ"
+
+          sed -i '' 's/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = "";/g' "$PBXPROJ" 2>/dev/null || \
+          sed -i 's/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = "";/g' "$PBXPROJ"
+
+          for xcconfig in ios/Flutter/Debug.xcconfig ios/Flutter/Release.xcconfig; do
+            echo "CODE_SIGNING_ALLOWED=NO" >> "$xcconfig"
+            echo "CODE_SIGNING_REQUIRED=NO" >> "$xcconfig"
+            echo 'CODE_SIGN_IDENTITY=' >> "$xcconfig"
+            echo 'CODE_SIGN_ENTITLEMENTS=' >> "$xcconfig"
+            echo 'DEVELOPMENT_TEAM=' >> "$xcconfig"
+          done
+      - name: Get Flutter packages
+        script: |
+          flutter packages pub get
+      - name: Flutter build iOS
+        script: |
+          flutter build ios --release --no-codesign \
+            --dart-define=FLUTTER_XCODE_CODE_SIGNING_ALLOWED=NO \
+            --dart-define=FLUTTER_XCODE_CODE_SIGNING_REQUIRED=NO \
+            -v
+      - name: Package Payload to IPA
+        script: |
+          cd build/ios/iphoneos/
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -q -r -y unsigned_ignite.ipa Payload/
+    artifacts:
+      - build/ios/iphoneos/unsigned_ignite.ipa
+    publishing:
+      email:
+        recipients:
+          - levanhuy96@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  linux-workflow:
+    name: Ignite Linux Build
+    instance_type: linux_x2
+    max_build_duration: 30
+    environment:
+      flutter: 3.41.6
+    scripts:
+      - name: Install Linux build dependencies
+        script: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev libblkid-dev liblzma-dev \
+            libsecret-1-dev libjsoncpp-dev
+      - name: Get Flutter packages
+        script: |
+          flutter packages pub get
+      - name: Flutter build Linux
+        script: |
+          flutter build linux --release
+      - name: Archive Linux binary
+        script: |
+          cd build/linux/x64/release/bundle
+          tar -czf ../../../../../ignite-linux-x64.tar.gz .
+    artifacts:
+      - ignite-linux-x64.tar.gz
+    publishing:
+      email:
+        recipients:
+          - levanhuy96@gmail.com
+        notify:
+          success: true
+          failure: true

@@ -332,9 +332,15 @@ class _BuildsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final buildsAsync = ref.watch(buildsProvider(app.id));
+    final workflowsAsync = ref.watch(workflowsProvider(app.id));
+    final wfNames = workflowsAsync.valueOrNull
+        ?.fold<Map<String, String>>({}, (map, wf) => map..[wf.id] = wf.name) ?? {};
 
     return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(buildsProvider(app.id)),
+      onRefresh: () async {
+        ref.invalidate(buildsProvider(app.id));
+        ref.invalidate(workflowsProvider(app.id));
+      },
       child: buildsAsync.when(
         data: (builds) {
           if (builds.isEmpty) {
@@ -345,13 +351,18 @@ class _BuildsTab extends ConsumerWidget {
             itemCount: builds.length,
             itemBuilder: (context, index) {
               final b = builds[index];
+              final displayName = b.fileWorkflowId?.isNotEmpty == true
+                  ? b.fileWorkflowId!
+                  : wfNames[b.workflowId] ?? b.workflowName;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _BuildItem(
                   item: b,
+                  displayName: displayName,
                   onTap: () => BuildDetailSheet.show(
                     context,
                     b,
+                    workflowDisplayName: displayName,
                     onCanceled: () => ref.invalidate(buildsProvider(app.id)),
                   ),
                 ).animate().fadeIn(delay: (40 * index).ms).slideX(begin: 0.05, end: 0),
@@ -380,8 +391,9 @@ class _BuildsTab extends ConsumerWidget {
 
 class _BuildItem extends StatelessWidget {
   final CmBuild item;
+  final String displayName;
   final VoidCallback? onTap;
-  const _BuildItem({required this.item, this.onTap});
+  const _BuildItem({required this.item, required this.displayName, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -429,7 +441,7 @@ class _BuildItem extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            item.workflowName,
+                            displayName.isNotEmpty ? displayName : item.workflowId,
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

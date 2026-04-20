@@ -1,45 +1,25 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart' hide ShareResult;
 import 'package:url_launcher/url_launcher.dart' as ul;
 import '../../core/models/app_model.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../core/providers/codemagic_provider.dart';
 import '../../core/theme/app_theme.dart';
 
-Future<void> _launchUrl(BuildContext context, String rawUrl) async {
-  final uri = Uri.tryParse(rawUrl);
-  if (uri == null) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invalid URL: $rawUrl'), backgroundColor: AppTheme.error),
-      );
-    }
-    return;
-  }
-  try {
-    final ok = await ul.launchUrl(uri, mode: ul.LaunchMode.externalApplication);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cannot open URL: $rawUrl'), backgroundColor: AppTheme.error),
-      );
-    }
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.error),
-      );
-    }
-  }
-}
-
 class BuildDetailSheet extends ConsumerStatefulWidget {
   final CmBuild build;
+  final String? workflowDisplayName;
   final VoidCallback? onCanceled;
 
-  const BuildDetailSheet({super.key, required this.build, this.onCanceled});
+  const BuildDetailSheet({super.key, required this.build, this.workflowDisplayName, this.onCanceled});
 
-  static Future<void> show(BuildContext context, CmBuild build, {VoidCallback? onCanceled}) {
+  static Future<void> show(BuildContext context, CmBuild build, {String? workflowDisplayName, VoidCallback? onCanceled}) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -47,7 +27,7 @@ class BuildDetailSheet extends ConsumerStatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => BuildDetailSheet(build: build, onCanceled: onCanceled),
+      builder: (ctx) => BuildDetailSheet(build: build, workflowDisplayName: workflowDisplayName, onCanceled: onCanceled),
     );
   }
 
@@ -79,6 +59,20 @@ class _BuildDetailSheetState extends ConsumerState<BuildDetailSheet> {
       }
     } finally {
       if (mounted) setState(() => _isCanceling = false);
+    }
+  }
+
+  Future<void> _launchUrl(String rawUrl) async {
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null) return;
+    try {
+      await ul.launchUrl(uri, mode: ul.LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Cannot open: $e'), backgroundColor: AppTheme.error),
+        );
+      }
     }
   }
 
@@ -143,7 +137,9 @@ class _BuildDetailSheetState extends ConsumerState<BuildDetailSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            b.workflowName,
+                            widget.workflowDisplayName?.isNotEmpty == true
+                                ? widget.workflowDisplayName!
+                                : b.workflowName.isNotEmpty ? b.workflowName : b.workflowId,
                             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                           Text(
@@ -213,7 +209,7 @@ class _BuildDetailSheetState extends ConsumerState<BuildDetailSheet> {
                 if (b.buildUrl != null) ...[
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
-                    onPressed: () => _launchUrl(context, b.buildUrl!),
+                    onPressed: () => _launchUrl(b.buildUrl!),
                     icon: const Icon(Icons.open_in_new, size: 16),
                     label: const Text('Open in Codemagic'),
                     style: OutlinedButton.styleFrom(
@@ -335,34 +331,98 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _ArtifactRow extends StatelessWidget {
+class _ArtifactRow extends ConsumerStatefulWidget {
   final CmArtifact artifact;
   const _ArtifactRow({required this.artifact});
 
   @override
+  ConsumerState<_ArtifactRow> createState() => _ArtifactRowState();
+}
+
+class _ArtifactRowState extends ConsumerState<_ArtifactRow> {
+  bool _downloading = false;
+  double? _progress;
+
+  Future<void> _download() async {
+    final url = widget.artifact.url;
+    if (url == null) return;
+    final token = ref.read(authProvider);
+    setState(() { _downloading = true; _progress = null; });
+    try {
+      final uri = Uri.parse(url);
+      final req = http.Request('GET', uri);
+      if (token != null && token.isNotEmpty) {
+        req.headers['x-auth-token'] = token;
+      }
+      final response = await req.send();
+      if (response.statusCode >= 400) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+      final total = response.contentLength ?? 0;
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/${widget.artifact.name}');
+      final sink = file.openWrite();
+      int received = 0;
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (total > 0 && mounted) {
+          setState(() => _progress = received / total);
+        }
+      }
+      await sink.close();
+      if (mounted) {
+        await Share.shareXFiles([XFile(file.path)], text: widget.artifact.name);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e'), backgroundColor: AppTheme.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() { _downloading = false; _progress = null; });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final sizeLabel = artifact.size != null ? _formatSize(artifact.size!) : '';
+    final sizeLabel = widget.artifact.size != null ? _formatSize(widget.artifact.size!) : '';
     return InkWell(
-      onTap: artifact.url != null ? () => _launchUrl(context, artifact.url!) : null,
+      onTap: widget.artifact.url != null && !_downloading ? _download : null,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            const Icon(Icons.file_download_outlined, size: 16, color: AppTheme.accent),
+            if (_downloading)
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  value: _progress,
+                  strokeWidth: 2,
+                  color: AppTheme.accent,
+                ),
+              )
+            else
+              const Icon(Icons.file_download_outlined, size: 16, color: AppTheme.accent),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(artifact.name, style: const TextStyle(fontSize: 13)),
-                  if (sizeLabel.isNotEmpty)
+                  Text(widget.artifact.name, style: const TextStyle(fontSize: 13)),
+                  if (_downloading && _progress != null)
+                    Text('${(_progress! * 100).toStringAsFixed(0)}%',
+                        style: const TextStyle(fontSize: 11, color: AppTheme.accent))
+                  else if (sizeLabel.isNotEmpty)
                     Text(sizeLabel, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
                 ],
               ),
             ),
-            if (artifact.url != null)
-              const Icon(Icons.open_in_new, size: 14, color: AppTheme.textMuted),
+            if (widget.artifact.url != null && !_downloading)
+              const Icon(Icons.download_rounded, size: 14, color: AppTheme.textMuted),
           ],
         ),
       ),

@@ -83,6 +83,7 @@ class CmBuild {
   final String appId;
   final String? appName;
   final String workflowId;
+  final String? fileWorkflowId;
   final String workflowName;
   final String status;
   final DateTime? startedAt;
@@ -99,6 +100,7 @@ class CmBuild {
     required this.appId,
     this.appName,
     required this.workflowId,
+    this.fileWorkflowId,
     required this.workflowName,
     required this.status,
     this.startedAt,
@@ -128,7 +130,18 @@ class CmBuild {
         ?? j['commitHash'];
 
     final artsList = artsRaw as List;
-    debugPrint('[CmBuild] id=${j['_id']} commit_keys=${commit?.keys.toList()} msg=$commitMsg arts=${artsList.length}');
+    final wf = j['workflow'] as Map<String, dynamic>?;
+    final workflowId = j['workflowId']?.toString()
+        ?? wf?['_id']?.toString()
+        ?? wf?['id']?.toString()
+        ?? '';
+    final fileWorkflowId = j['fileWorkflowId']?.toString();
+    final workflowName = wf?['name']?.toString()
+        ?? wf?['workflowName']?.toString()
+        ?? j['workflowName']?.toString()
+        ?? j['workflow_name']?.toString()
+        ?? fileWorkflowId
+        ?? workflowId;
 
     final arts = artsList
         .map((a) => CmArtifact.fromJson(a as Map<String, dynamic>))
@@ -138,15 +151,16 @@ class CmBuild {
       id: j['_id'] ?? j['id'] ?? '',
       appId: j['appId'] ?? '',
       appName: j['app']?['appName'] ?? j['appName'],
-      workflowId: j['workflowId'] ?? '',
-      workflowName: j['workflow']?['name'] ?? j['workflowName'] ?? j['workflowId'] ?? '',
+      workflowId: workflowId,
+      fileWorkflowId: fileWorkflowId,
+      workflowName: workflowName,
       status: j['status'] ?? 'unknown',
       startedAt: _parseDate(j['startedAt'] ?? j['createdAt']),
       finishedAt: _parseDate(j['finishedAt'] ?? j['completedAt']),
       branch: j['branch'] ?? j['branchName'],
       commitMessage: commitMsg?.toString(),
       commitHash: commitHash?.toString(),
-      buildNumber: j['buildNumber']?.toString() ?? j['number']?.toString(),
+      buildNumber: j['buildNumber']?.toString() ?? j['index']?.toString() ?? j['number']?.toString(),
       artifacts: arts,
       buildUrl: j['buildUrl'] ?? j['url'],
     );

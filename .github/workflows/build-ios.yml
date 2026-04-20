@@ -1,0 +1,74 @@
+name: Build iOS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: |
+          xcode-select -p
+          xcodebuild -version
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache/hosted
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Disable code signing completely
+        run: |
+          PBXPROJ="ios/Runner.xcodeproj/project.pbxproj"
+
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ"
+          sed -i '' 's/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = "";/g' "$PBXPROJ"
+
+          for xcconfig in ios/Flutter/Debug.xcconfig ios/Flutter/Release.xcconfig; do
+            echo "CODE_SIGNING_ALLOWED=NO" >> "$xcconfig"
+            echo "CODE_SIGNING_REQUIRED=NO" >> "$xcconfig"
+            echo 'CODE_SIGN_IDENTITY=' >> "$xcconfig"
+            echo 'CODE_SIGN_ENTITLEMENTS=' >> "$xcconfig"
+            echo 'DEVELOPMENT_TEAM=' >> "$xcconfig"
+          done
+
+      - name: Build iOS
+        run: flutter build ios --release --no-codesign
+
+      - name: Package IPA
+        run: |
+          rm -rf Payload
+          mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -r ignite.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: ignite.ipa
+          retention-days: 7
