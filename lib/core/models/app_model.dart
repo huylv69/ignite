@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 class CmApplication {
   final String id;
   final String appName;
@@ -46,7 +44,10 @@ class CmApplication {
     final owner = repo?['owner'] as Map<String, dynamic>?;
     final repoOwner = owner?['name']?.toString() ?? owner?['login']?.toString();
 
-    debugPrint('[CmApplication] id=${j['_id']} settingsSource=${j['settingsSource']} repoUrl=$repoUrl branches=${branches.length}');
+    // Try direct field first, then extract from URL
+    final repoNameRaw = repo?['name']?.toString()
+        ?? repo?['repoName']?.toString()
+        ?? _extractRepoName(repoUrl?.toString());
 
     return CmApplication(
       id: j['_id'] ?? j['id'] ?? '',
@@ -58,10 +59,22 @@ class CmApplication {
       branches: branches,
       settingsSource: j['settingsSource']?.toString() ?? 'ui',
       repoOwner: repoOwner,
-      repoName: repo?['name']?.toString(),
+      repoName: repoNameRaw,
       repoProvider: repo?['provider']?.toString(),
     );
   }
+}
+
+String? _extractRepoName(String? url) {
+  if (url == null) return null;
+  // https://github.com/owner/repo or https://github.com/owner/repo.git
+  // git@github.com:owner/repo.git
+  try {
+    final cleaned = url.replaceFirst(RegExp(r'\.git$'), '');
+    final parts = cleaned.replaceFirst('git@github.com:', 'https://github.com/').split('/');
+    if (parts.length >= 2) return parts.last;
+  } catch (_) {}
+  return null;
 }
 
 class CmWorkflow {
@@ -200,7 +213,6 @@ class CmArtifact {
         ?? j['artifactUrl']
         ?? j['link']
         ?? j['publicUrl'];
-    debugPrint('[CmArtifact] name=${j['name']} url=$url keys=${j.keys.toList()}');
     return CmArtifact(
       name: j['name'] ?? j['filename'] ?? 'Unknown',
       url: url?.toString(),

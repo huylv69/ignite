@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/app_model.dart';
 
@@ -50,14 +49,7 @@ class CodemagicApi {
     if (res.statusCode >= 400) {
       throw CodemagicApiException(res.statusCode, body['message']?.toString() ?? 'HTTP ${res.statusCode}');
     }
-    debugPrint('[Ignite API] ${res.request?.url}\n${res.body.substring(0, res.body.length.clamp(0, 1200))}');
     return body;
-  }
-
-  Future<String> getRawJson(String path) async {
-    final uri = Uri.parse('$_base$path');
-    final res = await http.get(uri, headers: _headers);
-    return res.body;
   }
 
   // ── Applications ─────────────────────────────────────────────────────────
@@ -154,53 +146,20 @@ class CodemagicApi {
 
   // ── File-based workflow resolution ────────────────────────────────────────
 
-  /// Resolves workflows for a file-based app via the official internal endpoint.
+  /// Resolves workflows for a file-based app via GitHub raw (public repos only).
   Future<YamlResolution> resolveFileWorkflows({
     required String appId,
     required String branch,
     String? owner,
     String? repo,
   }) async {
-    // 1. Official endpoint used by Codemagic web console
-    try {
-      final uri = Uri.parse('$_base/apps/$appId/fetch-file-configuration');
-      final res = await http.post(
-        uri,
-        headers: _headers,
-        body: jsonEncode({'branch': branch, 'commitHash': null, 'tag': null}),
-      );
-      debugPrint('[fetch-file-configuration] → ${res.statusCode} ${res.body.substring(0, res.body.length.clamp(0, 400))}');
-      if (res.statusCode == 200) {
-        final body = res.body.trim();
-        // Raw YAML
-        if (body.startsWith('workflows:') || body.contains('\nworkflows:')) {
-          return YamlResolution.yaml(body);
-        }
-        // JSON wrapper
-        if (body.startsWith('{')) {
-          final j = jsonDecode(body) as Map<String, dynamic>;
-          final yaml = j['yaml'] ?? j['content'] ?? j['fileContent'] ?? j['configuration'];
-          if (yaml is String && yaml.trim().isNotEmpty) return YamlResolution.yaml(yaml);
-          final ids = j['workflowIds'] ?? j['fileWorkflowIds'];
-          if (ids is List && ids.isNotEmpty) {
-            return YamlResolution.ids(ids.map((e) => e.toString()).toList());
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[fetch-file-configuration] error: $e');
-    }
-
-    // 2. Fallback: GitHub raw (public repos only)
     if (owner != null && repo != null) {
       try {
         final url = 'https://raw.githubusercontent.com/$owner/$repo/$branch/codemagic.yaml';
         final res = await http.get(Uri.parse(url));
-        debugPrint('[github-raw] → ${res.statusCode}');
         if (res.statusCode == 200) return YamlResolution.yaml(res.body);
       } catch (_) {}
     }
-
     return YamlResolution.failed();
   }
 }
@@ -209,9 +168,10 @@ class YamlResolution {
   final String? yaml;
   final List<String>? workflowIds;
   final bool failed;
+  final String? detail;
 
-  const YamlResolution._({this.yaml, this.workflowIds, this.failed = false});
+  const YamlResolution._({this.yaml, this.workflowIds, this.failed = false, this.detail});
   factory YamlResolution.yaml(String y) => YamlResolution._(yaml: y);
   factory YamlResolution.ids(List<String> ids) => YamlResolution._(workflowIds: ids);
-  factory YamlResolution.failed() => YamlResolution._(failed: true);
+  factory YamlResolution.failed({String? detail}) => YamlResolution._(failed: true, detail: detail);
 }

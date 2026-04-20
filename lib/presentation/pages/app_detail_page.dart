@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -47,7 +48,9 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
               backgroundColor: AppTheme.success,
             ),
           );
-          ref.invalidate(buildsProvider(widget.app.id));
+          // Give the API a moment to register the new build
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted) ref.invalidate(buildsProvider(widget.app.id));
         }
       }
     } catch (e) {
@@ -113,7 +116,8 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
       ),
     );
     if (triggered == true) {
-      ref.invalidate(buildsProvider(widget.app.id));
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) ref.invalidate(buildsProvider(widget.app.id));
     }
   }
 
@@ -184,61 +188,6 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
     );
   }
 
-  void _showRawDebug() async {
-    final api = ref.read(codemagicApiProvider);
-    if (api == null) return;
-    try {
-      final appJson = await api.getRawJson('/apps/${widget.app.id}');
-      final buildsJson = await api.getRawJson('/builds?appId=${widget.app.id}&limit=1');
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: AppTheme.bgElevated,
-          title: const Text('Raw API Response', style: TextStyle(fontSize: 16)),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: 500,
-            child: DefaultTabController(
-              length: 2,
-              child: Column(
-                children: [
-                  const TabBar(tabs: [Tab(text: 'App'), Tab(text: 'Build')]),
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        _JsonView(json: appJson),
-                        _JsonView(json: buildsJson),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: '$appJson\n\n$buildsJson'));
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('Copied to clipboard')),
-                );
-              },
-              child: const Text('Copy'),
-            ),
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Debug error: $e'), backgroundColor: AppTheme.error),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final workflowsAsync = ref.watch(workflowsProvider(widget.app.id));
@@ -247,11 +196,6 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
       appBar: AppBar(
         title: Text(widget.app.appName),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.data_object, size: 20),
-            tooltip: 'Raw API debug',
-            onPressed: () => _showRawDebug(),
-          ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -325,21 +269,49 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
 
 // ── Builds Tab ────────────────────────────────────────────────────────────────
 
-class _BuildsTab extends ConsumerWidget {
+class _BuildsTab extends ConsumerStatefulWidget {
   final CmApplication app;
   const _BuildsTab({required this.app});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final buildsAsync = ref.watch(buildsProvider(app.id));
-    final workflowsAsync = ref.watch(workflowsProvider(app.id));
+  ConsumerState<_BuildsTab> createState() => _BuildsTabState();
+}
+
+class _BuildsTabState extends ConsumerState<_BuildsTab> {
+  Timer? _pollTimer;
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  void _schedulePoll(bool hasRunning) {
+    _pollTimer?.cancel();
+    if (hasRunning) {
+      _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+        if (mounted) ref.invalidate(buildsProvider(widget.app.id));
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final buildsAsync = ref.watch(buildsProvider(widget.app.id));
+    final workflowsAsync = ref.watch(workflowsProvider(widget.app.id));
     final wfNames = workflowsAsync.valueOrNull
         ?.fold<Map<String, String>>({}, (map, wf) => map..[wf.id] = wf.name) ?? {};
 
+    // Start/stop polling based on whether any build is running
+    buildsAsync.whenData((builds) {
+      final hasRunning = builds.any((b) => b.isRunning);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _schedulePoll(hasRunning));
+    });
+
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(buildsProvider(app.id));
-        ref.invalidate(workflowsProvider(app.id));
+        ref.invalidate(buildsProvider(widget.app.id));
+        ref.invalidate(workflowsProvider(widget.app.id));
       },
       child: buildsAsync.when(
         data: (builds) {
@@ -363,7 +335,7 @@ class _BuildsTab extends ConsumerWidget {
                     context,
                     b,
                     workflowDisplayName: displayName,
-                    onCanceled: () => ref.invalidate(buildsProvider(app.id)),
+                    onCanceled: () => ref.invalidate(buildsProvider(widget.app.id)),
                   ),
                 ).animate().fadeIn(delay: (40 * index).ms).slideX(begin: 0.05, end: 0),
               );
@@ -378,7 +350,7 @@ class _BuildsTab extends ConsumerWidget {
               Text('Error: $e', style: const TextStyle(color: AppTheme.error)),
               const SizedBox(height: 12),
               ElevatedButton(
-                onPressed: () => ref.invalidate(buildsProvider(app.id)),
+                onPressed: () => ref.invalidate(buildsProvider(widget.app.id)),
                 child: const Text('Retry'),
               ),
             ],
@@ -728,18 +700,3 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-class _JsonView extends StatelessWidget {
-  final String json;
-  const _JsonView({required this.json});
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(8),
-      child: SelectableText(
-        json,
-        style: const TextStyle(fontFamily: 'monospace', fontSize: 11, height: 1.5),
-      ),
-    );
-  }
-}

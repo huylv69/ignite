@@ -59,9 +59,9 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
   List<YamlWorkflow> _workflows = [];
   YamlWorkflow? _selected;
   String _branch = 'main';
+  String? _loadingBranch; // guard against stale responses
   bool _isTriggering = false;
 
-  // Add-workflow input
   final _addController = TextEditingController();
   bool _showAddField = false;
 
@@ -78,43 +78,88 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
     super.dispose();
   }
 
+  String? _yamlError;
+
   Future<void> _loadWorkflows() async {
-    setState(() => _loading = true);
+    final requestBranch = _branch;
+    setState(() { _loading = true; _yamlError = null; _loadingBranch = requestBranch; });
 
-    final prefs = ref.read(sharedPreferencesProvider);
     final api = ref.read(codemagicApiProvider);
+    final prefs = ref.read(sharedPreferencesProvider);
 
-    // 1. Load cached workflow IDs for this app
-    final cached = await WorkflowCache.load(prefs, widget.app.id);
+    // 1. File-based apps: fetch & parse codemagic.yaml from the selected branch
+    if (widget.app.isFileBased && api != null) {
+      final resolution = await api.resolveFileWorkflows(
+        appId: widget.app.id,
+        branch: _branch,
+        owner: widget.app.repoOwner,
+        repo: widget.app.repoName,
+      );
 
-    // 2. Extract unique IDs from build history (runs in background)
-    List<String> fromBuilds = [];
-    if (api != null) {
-      try {
-        final builds = await api.getBuilds(appId: widget.app.id, limit: 50);
-        final seen = <String>{};
-        for (final b in builds) {
-          if (b.workflowId.isNotEmpty && seen.add(b.workflowId)) {
-            fromBuilds.add(b.workflowId);
-          }
-        }
-      } catch (_) {}
+      if (!mounted || _loadingBranch != requestBranch) return;
+
+      if (resolution.yaml != null) {
+        final parsed = YamlWorkflow.parseFromYaml(resolution.yaml!);
+        setState(() {
+          _loading = false;
+          _workflows = parsed;
+          _selected = parsed.isNotEmpty ? parsed.first : null;
+        });
+        return;
+      }
+
+      if (resolution.workflowIds != null) {
+        final wfs = resolution.workflowIds!
+            .map((id) => YamlWorkflow(id: id, name: id))
+            .toList();
+        setState(() {
+          _loading = false;
+          _workflows = wfs;
+          _selected = wfs.isNotEmpty ? wfs.first : null;
+        });
+        return;
+      }
+
+      _yamlError = 'Could not fetch codemagic.yaml — private or non-GitHub repo. Showing workflows from build history.';
     }
 
-    // 3. Merge: cached first, then build history (deduplicated)
+    // 2. Non-file-based apps: use API workflows
+    if (!widget.app.isFileBased) {
+      final wfs = widget.workflows
+          .map((wf) => YamlWorkflow(id: wf.id, name: wf.name))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _workflows = wfs;
+        _selected = wfs.isNotEmpty ? wfs.first : null;
+      });
+      return;
+    }
+
+    // 3. Fallback: build history (use fileWorkflowId for file-based apps)
+    final cached = await WorkflowCache.load(prefs, widget.app.id);
     final all = <String, YamlWorkflow>{};
     for (final id in cached) {
       all[id] = YamlWorkflow(id: id, name: id, fromCache: true);
     }
-    for (final id in fromBuilds) {
-      all.putIfAbsent(id, () => YamlWorkflow(id: id, name: id));
-    }
 
-    // 4. For UI-mode apps, also add API workflows
-    if (!widget.app.isFileBased) {
-      for (final wf in widget.workflows) {
-        all.putIfAbsent(wf.id, () => YamlWorkflow(id: wf.id, name: wf.name));
-      }
+    if (api != null) {
+      try {
+        final builds = await api.getBuilds(appId: widget.app.id, limit: 100);
+        final seen = <String>{};
+        for (final b in builds) {
+          // For file-based apps, fileWorkflowId is the YAML key (e.g. "ios-workflow")
+          final id = (widget.app.isFileBased ? b.fileWorkflowId : null)
+              ?? (b.workflowId.length < 30 ? b.workflowId : null); // skip UUIDs
+          if (id != null && id.isNotEmpty && seen.add(id)) {
+            all.putIfAbsent(id, () => YamlWorkflow(
+              id: id,
+              name: b.workflowName != b.workflowId ? b.workflowName : id,
+            ));
+          }
+        }
+      } catch (_) {}
     }
 
     if (!mounted) return;
@@ -214,7 +259,12 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
                       items: widget.app.branches
                           .map((b) => DropdownMenuItem(value: b, child: Text(b)))
                           .toList(),
-                      onChanged: (b) { if (b != null) setState(() => _branch = b); },
+                      onChanged: (b) {
+                        if (b != null) {
+                          setState(() => _branch = b);
+                          _loadWorkflows();
+                        }
+                      },
                     ),
                   ),
                 ),
@@ -225,20 +275,28 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
           if (widget.app.isFileBased)
             Container(
               width: double.infinity,
-              color: AppTheme.bgElevated,
+              color: _yamlError != null ? AppTheme.error.withValues(alpha: 0.12) : AppTheme.bgElevated,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  const Icon(Icons.description_outlined, size: 13, color: AppTheme.accent),
+                  Icon(
+                    _yamlError != null ? Icons.warning_amber_rounded : Icons.description_outlined,
+                    size: 13,
+                    color: _yamlError != null ? AppTheme.error : AppTheme.accent,
+                  ),
                   const SizedBox(width: 6),
-                  const Text(
-                    'codemagic.yaml',
-                    style: TextStyle(color: AppTheme.accent, fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  const Text(
-                    ' — workflow IDs from your YAML file',
-                    style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-                  ),
+                  if (_yamlError == null) ...[
+                    const Text('codemagic.yaml', style: TextStyle(color: AppTheme.accent, fontSize: 12, fontWeight: FontWeight.w600)),
+                    const Text(' — workflows loaded from YAML', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                  ] else
+                    Expanded(child: Text(_yamlError!, style: const TextStyle(color: AppTheme.error, fontSize: 12))),
+                  if (_yamlError != null) ...[
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: _loadWorkflows,
+                      child: const Text('Retry', style: TextStyle(color: AppTheme.accent, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -369,6 +427,7 @@ class _WorkflowTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasCustomName = workflow.name != workflow.id;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -395,14 +454,28 @@ class _WorkflowTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    workflow.id,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (hasCustomName)
+                        Text(
+                          workflow.name,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
+                          ),
+                        ),
+                      Text(
+                        workflow.id,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: hasCustomName ? 11 : 14,
+                          fontWeight: hasCustomName ? FontWeight.normal : FontWeight.w600,
+                          color: hasCustomName ? AppTheme.textMuted : (isSelected ? AppTheme.textPrimary : AppTheme.textSecondary),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 if (workflow.instanceType != null)

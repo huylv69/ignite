@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart' hide ShareResult;
 import 'package:url_launcher/url_launcher.dart' as ul;
 import '../../core/models/app_model.dart';
-import '../../core/providers/auth_provider.dart';
+import '../../core/providers/accounts_provider.dart';
 import '../../core/providers/codemagic_provider.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -342,11 +342,12 @@ class _ArtifactRow extends ConsumerStatefulWidget {
 class _ArtifactRowState extends ConsumerState<_ArtifactRow> {
   bool _downloading = false;
   double? _progress;
+  final _key = GlobalKey();
 
   Future<void> _download() async {
     final url = widget.artifact.url;
     if (url == null) return;
-    final token = ref.read(authProvider);
+    final token = ref.read(activeTokenProvider);
     setState(() { _downloading = true; _progress = null; });
     try {
       final uri = Uri.parse(url);
@@ -372,7 +373,15 @@ class _ArtifactRowState extends ConsumerState<_ArtifactRow> {
       }
       await sink.close();
       if (mounted) {
-        await Share.shareXFiles([XFile(file.path)], text: widget.artifact.name);
+        final box = _key.currentContext?.findRenderObject() as RenderBox?;
+        final origin = box != null
+            ? box.localToGlobal(Offset.zero) & box.size
+            : Rect.fromLTWH(0, 0, 200, 50);
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: widget.artifact.name,
+          sharePositionOrigin: origin,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -389,6 +398,7 @@ class _ArtifactRowState extends ConsumerState<_ArtifactRow> {
   Widget build(BuildContext context) {
     final sizeLabel = widget.artifact.size != null ? _formatSize(widget.artifact.size!) : '';
     return InkWell(
+      key: _key,
       onTap: widget.artifact.url != null && !_downloading ? _download : null,
       borderRadius: BorderRadius.circular(12),
       child: Padding(

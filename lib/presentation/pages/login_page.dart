@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/accounts_provider.dart';
+import '../../core/providers/biometric_provider.dart';
 import '../../core/services/codemagic_api.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -15,6 +17,7 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _tokenController = TextEditingController();
+  final _nameController = TextEditingController();
   bool _isLoading = false;
   bool _obscure = true;
   String? _error;
@@ -22,6 +25,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   void dispose() {
     _tokenController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -31,14 +35,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       setState(() => _error = 'API token is required');
       return;
     }
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    setState(() { _isLoading = true; _error = null; });
     try {
       final api = CodemagicApi(token);
-      await api.getApplications();
-      await ref.read(authProvider.notifier).login(token);
+      // Validate token + try to get a name from the API
+      String accountName = _nameController.text.trim();
+      final futures = await Future.wait([
+        api.getApplications(),
+        if (accountName.isEmpty) api.getUser().catchError((_) => <String, dynamic>{}),
+      ]);
+      if (accountName.isEmpty) {
+        final user = futures.length > 1 ? futures[1] as Map<String, dynamic> : {};
+        accountName = user['user']?['email']?.toString()
+            ?? user['email']?.toString()
+            ?? 'Account';
+      }
+      await ref.read(accountsProvider.notifier).addAccount(token, accountName);
+      ref.read(biometricUnlockedProvider.notifier).state = true;
       if (mounted) context.go('/');
     } catch (e) {
       setState(() => _error = 'Invalid token or connection failed');

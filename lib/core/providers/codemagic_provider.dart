@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/codemagic_api.dart';
 import '../models/app_model.dart';
-import 'auth_provider.dart';
+import 'accounts_provider.dart';
 
 final codemagicApiProvider = Provider<CodemagicApi?>((ref) {
-  final token = ref.watch(authProvider);
+  final token = ref.watch(activeTokenProvider);
   if (token == null || token.isEmpty) return null;
   return CodemagicApi(token);
 });
