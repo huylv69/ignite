@@ -29,7 +29,8 @@ void main() {
       final a = CmArtifact.fromJson({
         'name': 'unsigned_ignite.ipa',
         'type': 'ipa',
-        'url': 'https://api.codemagic.io/artifacts/a0f0/c3f0/unsigned_ignite.ipa',
+        'url':
+            'https://api.codemagic.io/artifacts/a0f0/c3f0/unsigned_ignite.ipa',
         'size': 7582792,
         'versionName': '1.0.0',
         'path': 'a0f0/c3f0/unsigned_ignite.ipa',

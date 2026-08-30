@@ -12,14 +12,21 @@
 - Khoá app bằng **sinh trắc học** khi mở lại (bỏ qua trên web).
 
 ### 📱 Danh sách ứng dụng
-- Liệt kê toàn bộ app trong tài khoản.
+- Liệt kê toàn bộ app trong tài khoản; **thêm app** từ URL repo public, **gỡ app** (giữ nhấn, phải gõ tên để xác nhận).
 - **Tìm kiếm** theo tên app hoặc URL repository.
 - Mỗi thẻ hiện **trạng thái build gần nhất** kèm thời gian, lấy bằng một request duy nhất cho cả danh sách.
 
 ### 📊 Build & thống kê
-- Lịch sử build theo từng app, tự động poll mỗi 12 giây khi có build đang chạy.
+- **Toàn bộ lịch sử build** theo từng app (API v3, phân trang cursor) — không còn cụt ở vài build gần nhất.
+- **Lọc** theo trạng thái (đang chạy / passed / failed / canceled) và branch, xử lý phía server.
+- Hiện tác giả commit, **labels**, số PR, release notes; bấm mở commit trên GitHub.
+- Tự động poll mỗi 12 giây khi có build đang chạy.
 - Biểu đồ phân bố kết quả và tỉ lệ thành công (`fl_chart`).
 - **Huỷ build** đang chạy.
+
+### 🔔 Thông báo build xong
+- Khi một build đang chạy chuyển sang passed / failed / canceled, app bắn **thông báo local** (Android/iOS) và banner trong app.
+- Không cần server: Codemagic không có webhook chiều ra, nên app poll 20 giây một lần khi đang mở.
 
 ### 📜 Log từng bước
 - Xem danh sách các bước của một build kèm trạng thái và thời lượng.
@@ -31,7 +38,7 @@
 
 ### ⚡ Kích hoạt build
 - Chọn workflow từ `codemagic.yaml` hoặc từ workflow editor.
-- Chạy theo **branch hoặc tag**.
+- Chạy theo **branch hoặc tag**, gắn **labels** để lọc lại sau.
 - Chọn **loại máy** (`mac_mini_m1`, `mac_mini_m2`, `linux_x2`, `windows_x2`) hoặc để workflow tự quyết.
 - Truyền biến môi trường ngay lúc kích hoạt.
 

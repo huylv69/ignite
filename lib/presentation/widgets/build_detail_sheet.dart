@@ -219,6 +219,28 @@ class _BuildDetailSheetState extends ConsumerState<BuildDetailSheet> {
                               );
                             },
                           ),
+                        if (b.authorName != null)
+                          _InfoRow(
+                            icon: Icons.person_outline,
+                            label: 'Author',
+                            value: b.authorName!,
+                          ),
+                        if (b.pullRequestNumber != null)
+                          _InfoRow(
+                            icon: Icons.merge_type,
+                            label: 'PR',
+                            value: '#${b.pullRequestNumber}',
+                          ),
+                        if (b.commitUrl != null)
+                          _InfoRow(
+                            icon: Icons.open_in_new,
+                            label: 'Link',
+                            value:
+                                Uri.tryParse(b.commitUrl!)?.host ??
+                                b.commitUrl!,
+                            onTap: () => _launchUrl(b.commitUrl!),
+                            trailing: Icons.open_in_new,
+                          ),
                         _InfoRow(
                           icon: Icons.call_split,
                           label: 'Branch',
@@ -226,6 +248,75 @@ class _BuildDetailSheetState extends ConsumerState<BuildDetailSheet> {
                         ),
                       ],
                     ),
+                    if (b.labels.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _Section(
+                        title: 'Labels',
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            child: Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children:
+                                  b.labels
+                                      .map(
+                                        (l) => Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 9,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.accent.withValues(
+                                              alpha: 0.14,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            l,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppTheme.accent,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (b.releaseNotes.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _Section(
+                        title: 'Release notes',
+                        children:
+                            b.releaseNotes
+                                .map(
+                                  (n) => Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 8,
+                                    ),
+                                    child: Text(
+                                      n,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     _Section(
                       title: 'Timing',
@@ -339,11 +430,15 @@ class _StepsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // v3 sends CORS headers, so the step list loads in a browser too; the
+    // legacy detail (which the artifact rows still need) covers it elsewhere.
+    final actions = ref.watch(buildActionsProvider(buildId));
     final detail = ref.watch(buildDetailProvider(buildId));
-    final steps = detail.valueOrNull?.buildActions ?? fallback;
+    final steps =
+        actions.valueOrNull ?? detail.valueOrNull?.buildActions ?? fallback;
 
     if (steps.isEmpty) {
-      if (detail.isLoading) {
+      if (actions.isLoading || detail.isLoading) {
         return const _Section(
           title: 'Steps',
           children: [
@@ -503,12 +598,14 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
   final VoidCallback? onTap;
+  final IconData trailing;
 
   const _InfoRow({
     required this.icon,
     required this.label,
     required this.value,
     this.onTap,
+    this.trailing = Icons.copy,
   });
 
   @override
@@ -544,7 +641,7 @@ class _InfoRow extends StatelessWidget {
               ),
             ),
             if (onTap != null)
-              const Icon(Icons.copy, size: 14, color: AppTheme.textMuted),
+              Icon(trailing, size: 14, color: AppTheme.textMuted),
           ],
         ),
       ),

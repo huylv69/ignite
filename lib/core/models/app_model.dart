@@ -118,6 +118,14 @@ class CmBuild {
   final String? instanceType;
   final String? tag;
 
+  // Only the v3 API carries these; legacy responses leave them empty.
+  final List<String> labels;
+  final String? authorName;
+  final String? authorAvatarUrl;
+  final String? commitUrl;
+  final int? pullRequestNumber;
+  final List<String> releaseNotes;
+
   const CmBuild({
     required this.id,
     required this.appId,
@@ -137,7 +145,56 @@ class CmBuild {
     this.buildActions = const [],
     this.instanceType,
     this.tag,
+    this.labels = const [],
+    this.authorName,
+    this.authorAvatarUrl,
+    this.commitUrl,
+    this.pullRequestNumber,
+    this.releaseNotes = const [],
   });
+
+  /// Parses an item from the v3 API (`/api/v3/teams/{id}/builds`,
+  /// `/api/v3/builds/{id}`), which is snake_case and resolves `workflow.name`
+  /// for file-based apps — something the legacy endpoints never did.
+  factory CmBuild.fromV3Json(Map<String, dynamic> j) {
+    Map<String, dynamic> m(dynamic v) =>
+        v is Map ? v.map((k, val) => MapEntry(k.toString(), val)) : const {};
+    List<String> strs(dynamic v) =>
+        v is List ? v.map((e) => e.toString()).toList() : const [];
+
+    final wf = m(j['workflow']);
+    final wfId = wf['id']?.toString() ?? '';
+    final isFile = wf['source'] == 'file';
+    final commit = m(j['commit']);
+    final pr = m(j['pull_request']);
+
+    return CmBuild(
+      id: j['id']?.toString() ?? '',
+      appId: j['app_id']?.toString() ?? '',
+      workflowId: wfId,
+      fileWorkflowId: isFile ? wfId : null,
+      workflowName: wf['name']?.toString() ?? wfId,
+      status: j['status']?.toString() ?? 'unknown',
+      startedAt: _parseDate(j['started_at'] ?? j['created_at']),
+      finishedAt: _parseDate(j['finished_at']),
+      branch: j['branch']?.toString(),
+      tag: j['tag']?.toString(),
+      commitMessage: commit['message']?.toString(),
+      commitHash: commit['hash']?.toString(),
+      commitUrl: commit['url']?.toString(),
+      authorName: commit['author_name']?.toString(),
+      authorAvatarUrl: commit['avatar_url']?.toString(),
+      buildNumber: j['index']?.toString(),
+      artifacts:
+          (j['artifacts'] as List? ?? [])
+              .map((a) => CmArtifact.fromV3Json(m(a)))
+              .toList(),
+      instanceType: j['instance_type']?.toString(),
+      labels: strs(j['labels']),
+      releaseNotes: strs(j['release_notes']),
+      pullRequestNumber: (pr['number'] as num?)?.toInt(),
+    );
+  }
 
   factory CmBuild.fromJson(Map<String, dynamic> j) {
     final commit = j['commit'] as Map<String, dynamic>?;
@@ -266,6 +323,17 @@ class CmArtifact {
     );
   }
 
+  /// v3 artifacts carry a short-lived signed url and no secure filename. The
+  /// url works for a download; [path] stays null so nobody hands it to the
+  /// public-url endpoint, which wants the secure filename.
+  factory CmArtifact.fromV3Json(Map<String, dynamic> j) => CmArtifact(
+    name: j['name']?.toString() ?? 'Unknown',
+    url: j['short_lived_download_url']?.toString(),
+    type: j['type']?.toString(),
+    size: (j['size_in_bytes'] as num?)?.toInt(),
+    versionName: j['version_name']?.toString(),
+  );
+
   static String? _pathFromUrl(String? url) {
     if (url == null) return null;
     const marker = '/artifacts/';
@@ -298,6 +366,14 @@ class CmBuildAction {
     status: j['status']?.toString() ?? 'unknown',
     startedAt: CmBuild._parseDate(j['startedAt']),
     finishedAt: CmBuild._parseDate(j['finishedAt']),
+  );
+
+  factory CmBuildAction.fromV3Json(Map<String, dynamic> j) => CmBuildAction(
+    id: j['id']?.toString() ?? '',
+    name: j['name']?.toString() ?? 'Unnamed step',
+    status: j['status']?.toString() ?? 'unknown',
+    startedAt: CmBuild._parseDate(j['started_at']),
+    finishedAt: CmBuild._parseDate(j['finished_at']),
   );
 
   bool get isSuccess => status == 'success';
@@ -473,4 +549,96 @@ class CmQuota {
       limitSeconds == 0 ? 0 : (usedSeconds / limitSeconds).clamp(0.0, 1.0);
 
   bool get hasLimit => limitSeconds > 0;
+}
+
+/// One page of `/api/v3/teams/{id}/builds`. Pagination is by cursor: pass
+/// [nextCursor] back to get the page after this one; null means the end.
+class CmBuildPage {
+  final List<CmBuild> builds;
+  final String? nextCursor;
+
+  const CmBuildPage({required this.builds, this.nextCursor});
+
+  bool get hasMore => nextCursor != null && nextCursor!.isNotEmpty;
+
+  factory CmBuildPage.fromV3Json(Map<String, dynamic> j) => CmBuildPage(
+    builds:
+        (j['data'] as List? ?? [])
+            .map((b) => CmBuild.fromV3Json(b as Map<String, dynamic>))
+            .toList(),
+    nextCursor: j['cursor']?.toString(),
+  );
+}
+
+/// Server-side filters the v3 builds list understands.
+class BuildsQuery {
+  /// One of queued, building, finished, failed, canceled, timeout, skipped.
+  final String? status;
+  final String? branch;
+  final String? tag;
+  final String? workflowId;
+  final List<String> labels;
+
+  const BuildsQuery({
+    this.status,
+    this.branch,
+    this.tag,
+    this.workflowId,
+    this.labels = const [],
+  });
+
+  bool get isEmpty =>
+      status == null &&
+      branch == null &&
+      tag == null &&
+      workflowId == null &&
+      labels.isEmpty;
+
+  BuildsQuery copyWith({
+    Object? status = _unset,
+    Object? branch = _unset,
+    Object? tag = _unset,
+    Object? workflowId = _unset,
+    List<String>? labels,
+  }) => BuildsQuery(
+    status: status == _unset ? this.status : status as String?,
+    branch: branch == _unset ? this.branch : branch as String?,
+    tag: tag == _unset ? this.tag : tag as String?,
+    workflowId: workflowId == _unset ? this.workflowId : workflowId as String?,
+    labels: labels ?? this.labels,
+  );
+
+  static const _unset = Object();
+
+  Map<String, String> toParams({
+    required String appId,
+    String? cursor,
+    int pageSize = 30,
+  }) {
+    final p = <String, String>{'app_id': appId};
+    if (status != null) p['status'] = status!;
+    if (branch != null) p['branch'] = branch!;
+    if (tag != null) p['tag'] = tag!;
+    if (workflowId != null) p['workflow_id'] = workflowId!;
+    // The API takes `label` repeated; a single joined value is what the
+    // http package can express through a flat map, and one label at a time is
+    // what the UI offers anyway.
+    if (labels.isNotEmpty) p['label'] = labels.join(',');
+    if (cursor != null && cursor.isNotEmpty) p['cursor'] = cursor;
+    p['page_size'] = pageSize.toString();
+    return p;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is BuildsQuery &&
+      other.status == status &&
+      other.branch == branch &&
+      other.tag == tag &&
+      other.workflowId == workflowId &&
+      other.labels.join(',') == labels.join(',');
+
+  @override
+  int get hashCode =>
+      Object.hash(status, branch, tag, workflowId, labels.join(','));
 }

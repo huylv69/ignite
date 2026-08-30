@@ -90,6 +90,26 @@ class _AppsPageState extends ConsumerState<AppsPage> {
                   tooltip: 'About',
                   onPressed: () => _showInfoSheet(context, ref),
                 ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  color: AppTheme.bgElevated,
+                  onSelected: (v) {
+                    if (v == 'add') _addApp(context, ref);
+                  },
+                  itemBuilder:
+                      (_) => const [
+                        PopupMenuItem(
+                          value: 'add',
+                          child: Row(
+                            children: [
+                              Icon(Icons.add_rounded, size: 18),
+                              SizedBox(width: 10),
+                              Text('Add app from repository'),
+                            ],
+                          ),
+                        ),
+                      ],
+                ),
                 const SizedBox(width: 4),
               ],
               bottom: PreferredSize(
@@ -267,6 +287,7 @@ class _AppCard extends ConsumerWidget {
     return Card(
       child: InkWell(
         onTap: () => context.push('/app/${app.id}', extra: app),
+        onLongPress: () => _confirmRemoveApp(context, ref, app),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -592,4 +613,158 @@ void _showCoffeeQRDialog(BuildContext context) {
           ),
         ),
   );
+}
+
+/// Adds a public repository as a new Codemagic app.
+Future<void> _addApp(BuildContext context, WidgetRef ref) async {
+  final controller = TextEditingController();
+  final url = await showDialog<String>(
+    context: context,
+    builder:
+        (ctx) => AlertDialog(
+          backgroundColor: AppTheme.bgCard,
+          title: const Text('Add app'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'Repository URL',
+                  hintText: 'https://github.com/owner/repo',
+                ),
+                onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Public repositories only. A private one needs an SSH key, '
+                'which the Codemagic console handles.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.textMuted,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+  );
+  if (url == null || url.isEmpty) return;
+  final api = ref.read(codemagicApiProvider);
+  if (api == null) return;
+  try {
+    final app = await api.addApplication(url);
+    ref.invalidate(appsProvider);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Added ${app.appName}'),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not add app: $e'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
+  }
+}
+
+/// Removing an app from Codemagic deletes its build history and variables, so
+/// the confirmation asks for the name to be typed rather than a bare tap.
+Future<void> _confirmRemoveApp(
+  BuildContext context,
+  WidgetRef ref,
+  CmApplication app,
+) async {
+  final controller = TextEditingController();
+  final ok = await showDialog<bool>(
+    context: context,
+    builder:
+        (ctx) => StatefulBuilder(
+          builder:
+              (ctx, setState) => AlertDialog(
+                backgroundColor: AppTheme.bgCard,
+                title: Text('Remove ${app.appName}?'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'This removes the app from Codemagic along with its builds, '
+                      'caches and variables. The repository itself is untouched.',
+                      style: TextStyle(fontSize: 13, height: 1.4),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Type "${app.appName}" to confirm',
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed:
+                        controller.text.trim() == app.appName
+                            ? () => Navigator.pop(ctx, true)
+                            : null,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.error,
+                    ),
+                    child: const Text('Remove'),
+                  ),
+                ],
+              ),
+        ),
+  );
+  if (ok != true) return;
+  final api = ref.read(codemagicApiProvider);
+  if (api == null) return;
+  try {
+    await api.deleteApplication(app.id);
+    ref.invalidate(appsProvider);
+    ref.invalidate(latestBuildsProvider);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Removed ${app.appName}'),
+          backgroundColor: AppTheme.warning,
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not remove app: $e'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
+  }
 }

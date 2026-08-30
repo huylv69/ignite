@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/accounts_provider.dart';
 import 'core/providers/biometric_provider.dart';
+import 'core/providers/build_watch_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/models/app_model.dart';
 import 'presentation/pages/login_page.dart';
@@ -72,6 +73,8 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
+final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
 class CodemagicAdminApp extends ConsumerWidget {
   const CodemagicAdminApp({super.key});
 
@@ -79,12 +82,43 @@ class CodemagicAdminApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
 
+    // Poll for finished builds while signed in. The watcher posts the native
+    // notification; this listener adds an in-app banner, which is also the
+    // whole story on web where there is no notification centre to post to.
+    if (ref.watch(accountsProvider).active != null) {
+      ref.watch(buildWatcherProvider);
+    }
+    ref.listen<CmBuild?>(lastFinishedBuildProvider, (_, b) {
+      if (b == null) return;
+      final label =
+          b.isSuccess
+              ? 'passed'
+              : b.isFailed
+              ? 'failed'
+              : b.isCanceled
+              ? 'was canceled'
+              : b.status;
+      _messengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text('${b.workflowName} #${b.buildNumber ?? '?'} $label'),
+          backgroundColor:
+              b.isSuccess
+                  ? AppTheme.success
+                  : b.isFailed
+                  ? AppTheme.error
+                  : AppTheme.warning,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    });
+
     return MaterialApp.router(
       title: 'Ignite',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       themeMode: ThemeMode.dark,
       routerConfig: router,
+      scaffoldMessengerKey: _messengerKey,
     );
   }
 }

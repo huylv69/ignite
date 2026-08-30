@@ -73,6 +73,7 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
 
   final _addController = TextEditingController();
   final _tagController = TextEditingController();
+  final _labelsController = TextEditingController();
   bool _showAddField = false;
 
   /// Machine types Codemagic exposes. A null selection lets the workflow's own
@@ -95,6 +96,7 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
   void dispose() {
     _addController.dispose();
     _tagController.dispose();
+    _labelsController.dispose();
     super.dispose();
   }
 
@@ -245,6 +247,12 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
         branch: useTag ? null : _branch,
         tag: useTag ? tag : null,
         instanceType: _instanceType,
+        labels:
+            _labelsController.text
+                .split(',')
+                .map((l) => l.trim())
+                .where((l) => l.isNotEmpty)
+                .toList(),
       );
       if (mounted) {
         final target = useTag ? 'tag $tag' : _branch;
@@ -600,6 +608,24 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
                     ),
           ),
 
+          // Labels ride along on the build and can be filtered on later.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: TextField(
+              controller: _labelsController,
+              style: const TextStyle(fontSize: 13),
+              decoration: const InputDecoration(
+                isDense: true,
+                labelText: 'Labels (optional)',
+                hintText: 'release, hotfix',
+                prefixIcon: Icon(
+                  Icons.sell_outlined,
+                  size: 18,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+            ),
+          ),
           // Trigger button
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),

@@ -12,6 +12,11 @@ class CodemagicApiException implements Exception {
 
 class CodemagicApi {
   static const String _base = 'https://api.codemagic.io';
+
+  /// The v3 API lives on the main host, not the api subdomain, and unlike the
+  /// legacy `/user` and step-log endpoints it answers with CORS headers — so
+  /// everything reached through here also works in a browser.
+  static const String _v3 = 'https://codemagic.io/api/v3';
   final String token;
 
   CodemagicApi(this.token);
@@ -93,6 +98,15 @@ class CodemagicApi {
     return const [];
   }
 
+  Future<Map<String, dynamic>> _getV3(
+    String path, {
+    Map<String, String>? params,
+  }) async {
+    final uri = Uri.parse('$_v3$path').replace(queryParameters: params);
+    final res = await http.get(uri, headers: _headers);
+    return _handle(res);
+  }
+
   /// Reads the error text out of a failed response without assuming it is JSON.
   String _messageOf(http.Response res) {
     try {
@@ -117,6 +131,19 @@ class CodemagicApi {
 
   Future<Map<String, dynamic>> getApplication(String appId) async {
     return await _get('/apps/$appId');
+  }
+
+  /// Adds a repository as a new app. Public repos only through this call; a
+  /// private one needs an SSH key and `POST /apps/new`, which the console
+  /// handles better than a phone would.
+  Future<CmApplication> addApplication(String repositoryUrl) async {
+    final data = await _post('/apps', {'repositoryUrl': repositoryUrl});
+    final app = data['application'] as Map<String, dynamic>? ?? data;
+    return CmApplication.fromJson(app);
+  }
+
+  Future<void> deleteApplication(String appId) async {
+    await _delete('/apps/$appId');
   }
 
   Future<List<CmWorkflow>> getWorkflows(String appId) async {
@@ -157,6 +184,49 @@ class CodemagicApi {
     return CmBuild.fromJson(data['build'] as Map<String, dynamic>);
   }
 
+  /// The team's builds from the v3 API, one cursor page at a time.
+  ///
+  /// This replaces the legacy `GET /builds` for listing: that endpoint only
+  /// returns a narrow recent window (it answered 0 for an app whose builds v3
+  /// lists back to April), while this one keeps the full history, filters
+  /// server-side, and resolves `workflow.name` for file-based apps.
+  Future<CmBuildPage> getTeamBuilds({
+    required String teamId,
+    required String appId,
+    BuildsQuery query = const BuildsQuery(),
+    String? cursor,
+    int pageSize = 30,
+  }) async {
+    final data = await _getV3(
+      '/teams/$teamId/builds',
+      params: query.toParams(appId: appId, cursor: cursor, pageSize: pageSize),
+    );
+    return CmBuildPage.fromV3Json(data);
+  }
+
+  /// Newest builds across every app in the team — one request for the home
+  /// screen's status chips.
+  Future<List<CmBuild>> getRecentTeamBuilds(
+    String teamId, {
+    int pageSize = 30,
+  }) async {
+    final data = await _getV3(
+      '/teams/$teamId/builds',
+      params: {'page_size': pageSize.toString()},
+    );
+    return CmBuildPage.fromV3Json(data).builds;
+  }
+
+  /// A build's steps from v3. Same data as `buildActions` on the legacy detail,
+  /// but reachable from a browser.
+  Future<List<CmBuildAction>> getBuildActions(String buildId) async {
+    final data = await _getV3('/builds/$buildId/actions');
+    final items = data['data'] as List? ?? [];
+    return items
+        .map((a) => CmBuildAction.fromV3Json(a as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Fetches a build with its steps. Builds age out of `GET /builds`, but stay
   /// readable here by id.
   Future<CmBuild> getBuildDetail(String buildId) async {
@@ -176,8 +246,10 @@ class CodemagicApi {
     String? tag,
     String? instanceType,
     Map<String, String>? environment,
+    List<String> labels = const [],
   }) async {
     final body = <String, dynamic>{'appId': appId, 'workflowId': workflowId};
+    if (labels.isNotEmpty) body['labels'] = labels;
     if (tag != null && tag.isNotEmpty) {
       body['tag'] = tag;
     } else if (branch != null && branch.isNotEmpty) {

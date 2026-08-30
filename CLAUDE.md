@@ -85,8 +85,20 @@ Verified by hand against the live API. Getting these wrong is silent:
   no CORS headers**, unlike `/apps` and `/builds`, so browsers cannot read it —
   step logs work on mobile and desktop only, and the web build says so instead
   of showing a fetch error.
-- Builds age out of `GET /builds` but stay readable via `GET /builds/:id`. An
-  empty Builds tab does not mean the app never built.
+- **Legacy `GET /builds` only returns a narrow recent window** — it answered 0
+  for an app whose builds v3 lists back to April. This is not retention. List
+  builds through **v3 `GET /api/v3/teams/{team_id}/builds`** instead: full
+  history, cursor pagination, server-side `status`/`branch`/`tag`/`label`
+  filters, and `workflow.name` resolved for file-based apps.
+- **The v3 API lives at `https://codemagic.io/api/v3`** (not the api
+  subdomain) and **does send CORS headers** (`*`, preflight OK), so everything
+  reached through it works on web. Its `/user` does not carry a team id; for a
+  personal account take `ownerTeam` from legacy `/apps`.
+- **Everything under `/api/v3/teams/{id}/*` other than `builds`, `apps` and
+  `subscriptions` answers 404 for a personal account**, as does App Preview
+  (`POST /builds/:id/preview`) — the 404 body is an S3 `403.html`, i.e. a
+  disguised permission denial. Dashboards, tester groups, audit log and
+  previews are team-plan features.
 - Artefacts use the British spelling `artefacts`, and their `path` field is the
   `secureFilename` the public-url endpoint is addressed by.
 - `fileWorkflowIds` comes back empty even for `settingsSource: "file"` apps,

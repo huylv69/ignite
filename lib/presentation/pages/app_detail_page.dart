@@ -9,6 +9,7 @@ import '../../core/providers/codemagic_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../widgets/ignite_mark.dart';
 import '../widgets/build_detail_sheet.dart';
+import '../widgets/skeletons.dart';
 import 'caches_page.dart';
 import 'variables_page.dart';
 import 'yaml_trigger_page.dart';
@@ -380,102 +381,330 @@ class _BuildsTab extends ConsumerStatefulWidget {
 
 class _BuildsTabState extends ConsumerState<_BuildsTab> {
   Timer? _pollTimer;
+  final _scroll = ScrollController();
+
+  static const _statusFilters = <String?, String>{
+    null: 'All',
+    'building': 'Running',
+    'finished': 'Passed',
+    'failed': 'Failed',
+    'canceled': 'Canceled',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_maybeLoadMore);
+  }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _scroll.dispose();
     super.dispose();
   }
 
+  void _maybeLoadMore() {
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    if (pos.pixels > pos.maxScrollExtent - 400) {
+      ref.read(buildsFeedProvider(widget.app.id).notifier).loadMore();
+    }
+  }
+
+  // Poll while something is running; the feed refresh keeps the scroll
+  // position because it replaces the list in place rather than rebuilding
+  // the provider.
   void _schedulePoll(bool hasRunning) {
     _pollTimer?.cancel();
     if (hasRunning) {
       _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) {
-        if (mounted) ref.invalidate(buildsProvider(widget.app.id));
+        if (mounted) {
+          ref.read(buildsFeedProvider(widget.app.id).notifier).refresh();
+        }
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final buildsAsync = ref.watch(buildsProvider(widget.app.id));
-    final workflowsAsync = ref.watch(workflowsProvider(widget.app.id));
+    final feed = ref.watch(buildsFeedProvider(widget.app.id));
+    final notifier = ref.read(buildsFeedProvider(widget.app.id).notifier);
     final wfNames =
-        workflowsAsync.valueOrNull?.fold<Map<String, String>>(
-          {},
-          (map, wf) => map..[wf.id] = wf.name,
-        ) ??
+        ref
+            .watch(workflowsProvider(widget.app.id))
+            .valueOrNull
+            ?.fold<Map<String, String>>({}, (m, wf) => m..[wf.id] = wf.name) ??
         {};
 
-    // Start/stop polling based on whether any build is running
-    buildsAsync.whenData((builds) {
-      final hasRunning = builds.any((b) => b.isRunning);
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _schedulePoll(hasRunning),
-      );
-    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _schedulePoll(feed.hasRunning),
+    );
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        ref.invalidate(buildsProvider(widget.app.id));
-        ref.invalidate(workflowsProvider(widget.app.id));
-      },
-      child: buildsAsync.when(
-        data: (builds) {
-          if (builds.isEmpty) {
-            return const Center(child: Text('No builds found.'));
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-            itemCount: builds.length,
-            itemBuilder: (context, index) {
-              final b = builds[index];
-              final displayName =
-                  b.fileWorkflowId?.isNotEmpty == true
-                      ? b.fileWorkflowId!
-                      : wfNames[b.workflowId] ?? b.workflowName;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _BuildItem(
-                      item: b,
-                      displayName: displayName,
-                      onTap:
-                          () => BuildDetailSheet.show(
-                            context,
-                            b,
-                            workflowDisplayName: displayName,
-                            onCanceled:
-                                () => ref.invalidate(
-                                  buildsProvider(widget.app.id),
-                                ),
-                          ),
-                    )
-                    .animate()
-                    .fadeIn(delay: (40 * index).ms)
-                    .slideX(begin: 0.05, end: 0),
-              );
+    return Column(
+      children: [
+        _FilterBar(
+          statuses: _statusFilters,
+          branches: widget.app.branches,
+          query: feed.query,
+          onChanged: notifier.setQuery,
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await notifier.refresh();
+              ref.invalidate(workflowsProvider(widget.app.id));
             },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error:
-            (e, _) => Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Error: $e',
-                    style: const TextStyle(color: AppTheme.error),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed:
-                        () => ref.invalidate(buildsProvider(widget.app.id)),
-                    child: const Text('Retry'),
-                  ),
-                ],
+            child: _feedBody(feed, notifier, wfNames),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _feedBody(
+    BuildsFeedState feed,
+    BuildsFeedNotifier notifier,
+    Map<String, String> wfNames,
+  ) {
+    if (feed.loadingFirst) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        children: List.generate(
+          5,
+          (_) => const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: BuildItemSkeleton(),
+          ),
+        ),
+      );
+    }
+    if (feed.error != null && feed.builds.isEmpty) {
+      return ListView(
+        children: [
+          const SizedBox(height: 120),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Error: ${feed.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppTheme.error),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: notifier.refresh,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+    if (feed.builds.isEmpty) {
+      return ListView(
+        children: [
+          const SizedBox(height: 120),
+          Center(
+            child: Text(
+              feed.query.isEmpty
+                  ? 'No builds yet.'
+                  : 'No builds match this filter.',
+              style: const TextStyle(color: AppTheme.textSecondary),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      controller: _scroll,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      itemCount: feed.builds.length + 1,
+      itemBuilder: (context, index) {
+        if (index == feed.builds.length) {
+          if (feed.loadingMore) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+          if (feed.hasMore) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: TextButton(
+                  onPressed: notifier.loadMore,
+                  child: const Text('Load older builds'),
+                ),
+              ),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: Text(
+                '${feed.builds.length} build${feed.builds.length == 1 ? '' : 's'} · end of history',
+                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
               ),
             ),
+          );
+        }
+        final b = feed.builds[index];
+        // v3 already resolves the workflow name; the map only fills in for the
+        // rare legacy-shaped build.
+        final displayName =
+            b.workflowName.isNotEmpty
+                ? b.workflowName
+                : wfNames[b.workflowId] ?? b.workflowId;
+        final item = _BuildItem(
+          item: b,
+          displayName: displayName,
+          onTap:
+              () => BuildDetailSheet.show(
+                context,
+                b,
+                workflowDisplayName: displayName,
+                onCanceled: notifier.refresh,
+              ),
+        );
+        // Only the first page animates in; appended pages should not flicker.
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child:
+              index < 30
+                  ? item
+                      .animate()
+                      .fadeIn(delay: (40 * index).ms)
+                      .slideX(begin: 0.05, end: 0)
+                  : item,
+        );
+      },
+    );
+  }
+}
+
+/// Status chips plus a branch picker, mapped straight onto the v3 filters.
+class _FilterBar extends StatelessWidget {
+  final Map<String?, String> statuses;
+  final List<String> branches;
+  final BuildsQuery query;
+  final ValueChanged<BuildsQuery> onChanged;
+
+  const _FilterBar({
+    required this.statuses,
+    required this.branches,
+    required this.query,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        children: [
+          for (final e in statuses.entries) ...[
+            _Chip(
+              label: e.value,
+              selected: query.status == e.key,
+              onTap: () => onChanged(query.copyWith(status: e.key)),
+            ),
+            const SizedBox(width: 6),
+          ],
+          if (branches.length > 1) ...[
+            const SizedBox(width: 6),
+            PopupMenuButton<String?>(
+              color: AppTheme.bgElevated,
+              onSelected: (b) => onChanged(query.copyWith(branch: b)),
+              itemBuilder:
+                  (_) => [
+                    const PopupMenuItem<String?>(
+                      value: null,
+                      child: Text('Any branch'),
+                    ),
+                    ...branches.map(
+                      (b) => PopupMenuItem<String?>(value: b, child: Text(b)),
+                    ),
+                  ],
+              child: _Chip(
+                label: query.branch ?? 'Branch',
+                selected: query.branch != null,
+                icon: Icons.call_split,
+                trailing: Icons.arrow_drop_down,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+  final IconData? icon;
+  final IconData? trailing;
+
+  const _Chip({
+    required this.label,
+    required this.selected,
+    this.onTap,
+    this.icon,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppTheme.primary : AppTheme.textSecondary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color:
+              selected
+                  ? AppTheme.primary.withValues(alpha: 0.14)
+                  : AppTheme.bgCard,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color:
+                selected
+                    ? AppTheme.primary.withValues(alpha: 0.5)
+                    : AppTheme.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 13, color: color),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: color,
+              ),
+            ),
+            if (trailing != null) Icon(trailing, size: 16, color: color),
+          ],
+        ),
       ),
     );
   }
@@ -567,9 +796,51 @@ class _BuildItem extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (item.labels.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children:
+                            item.labels
+                                .map(
+                                  (l) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.accent.withValues(
+                                        alpha: 0.14,
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      l,
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.accent,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [
+                        if (item.authorAvatarUrl != null) ...[
+                          CircleAvatar(
+                            radius: 7,
+                            backgroundColor: AppTheme.bgElevated,
+                            backgroundImage: NetworkImage(
+                              item.authorAvatarUrl!,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
                         const Icon(
                           Icons.call_split,
                           size: 13,

@@ -30,7 +30,7 @@ void main() {
     expect(q.usedSeconds, 1258);
     expect(q.limitSeconds, 30000);
     expect(q.concurrency, 1);
-    expect(q.usedMinutes, 21);   // 1258s = 20.97 min, and a started minute counts
+    expect(q.usedMinutes, 21); // 1258s = 20.97 min, and a started minute counts
     expect(q.limitMinutes, 500);
     expect(q.remainingMinutes, 479);
   });
@@ -67,9 +67,13 @@ void main() {
   test('falls back to freeLimit when monthlyFreeBuildTimeLimit is absent', () {
     final q = CmQuota.fromUserJson({
       'user': {
-        'buildTimes': {'currentPeriod': {'free': 60}},
+        'buildTimes': {
+          'currentPeriod': {'free': 60},
+        },
         'billing': {
-          'usage': {'freeLimit': {'buildTime': 600}},
+          'usage': {
+            'freeLimit': {'buildTime': 600},
+          },
         },
       },
     });
