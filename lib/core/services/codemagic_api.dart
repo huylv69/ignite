@@ -58,6 +58,41 @@ class CodemagicApi {
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> _put(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final uri = Uri.parse('$_base$path');
+    final res = await http.put(uri, headers: _headers, body: jsonEncode(body));
+    return _handle(res);
+  }
+
+  /// For endpoints that answer with `text/plain` rather than JSON — step logs.
+  Future<String> _getText(String path) async {
+    final res = await http.get(Uri.parse('$_base$path'), headers: _headers);
+    if (res.statusCode >= 400) {
+      throw CodemagicApiException(res.statusCode, _messageOf(res));
+    }
+    return res.body;
+  }
+
+  /// For endpoints that answer with a bare JSON array — variables.
+  Future<List<dynamic>> _getList(String path) async {
+    final res = await http.get(Uri.parse('$_base$path'), headers: _headers);
+    if (res.statusCode >= 400) {
+      throw CodemagicApiException(res.statusCode, _messageOf(res));
+    }
+    if (res.body.isEmpty) return const [];
+    final decoded = jsonDecode(res.body);
+    if (decoded is List) return decoded;
+    if (decoded is Map<String, dynamic>) {
+      for (final v in decoded.values) {
+        if (v is List) return v;
+      }
+    }
+    return const [];
+  }
+
   /// Reads the error text out of a failed response without assuming it is JSON.
   String _messageOf(http.Response res) {
     try {
@@ -122,17 +157,35 @@ class CodemagicApi {
     return CmBuild.fromJson(data['build'] as Map<String, dynamic>);
   }
 
+  /// Fetches a build with its steps. Builds age out of `GET /builds`, but stay
+  /// readable here by id.
+  Future<CmBuild> getBuildDetail(String buildId) async {
+    final data = await _get('/builds/$buildId');
+    return CmBuild.fromJson(data['build'] as Map<String, dynamic>);
+  }
+
+  /// Raw log text for one build step. Returns `text/plain`, not JSON.
+  Future<String> getStepLog(String buildId, String stepId) =>
+      _getText('/builds/$buildId/step/$stepId');
+
+  /// The API wants exactly one of [branch] or [tag].
   Future<String> triggerBuild({
     required String appId,
     required String workflowId,
-    String branch = 'main',
+    String? branch = 'main',
+    String? tag,
+    String? instanceType,
     Map<String, String>? environment,
   }) async {
-    final body = <String, dynamic>{
-      'appId': appId,
-      'workflowId': workflowId,
-      'branch': branch,
-    };
+    final body = <String, dynamic>{'appId': appId, 'workflowId': workflowId};
+    if (tag != null && tag.isNotEmpty) {
+      body['tag'] = tag;
+    } else if (branch != null && branch.isNotEmpty) {
+      body['branch'] = branch;
+    }
+    if (instanceType != null && instanceType.isNotEmpty) {
+      body['instanceType'] = instanceType;
+    }
     if (environment != null && environment.isNotEmpty) {
       body['environment'] = {'variables': environment};
     }
@@ -177,6 +230,64 @@ class CodemagicApi {
       running: running,
       canceled: canceled,
     );
+  }
+
+  // ── Artifacts ─────────────────────────────────────────────────────────────
+
+  /// Turns an artifact's secure filename into a time-limited public link that
+  /// needs no auth token, so it can be handed to someone else.
+  Future<String> createArtifactPublicUrl(
+    String path,
+    DateTime expiresAt,
+  ) async {
+    final data = await _post('/artifacts/$path/public-url', {
+      'expiresAt': expiresAt.millisecondsSinceEpoch ~/ 1000,
+    });
+    final url = data['url']?.toString();
+    if (url == null || url.isEmpty) {
+      throw const CodemagicApiException(500, 'No public URL returned');
+    }
+    return url;
+  }
+
+  // ── Caches ────────────────────────────────────────────────────────────────
+
+  Future<List<CmCache>> getCaches(String appId) async {
+    final data = await _get('/apps/$appId/caches');
+    final caches = data['caches'] as List? ?? [];
+    return caches
+        .map((c) => CmCache.fromJson(c as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> deleteCache(String appId, String cacheId) async {
+    await _delete('/apps/$appId/caches/$cacheId');
+  }
+
+  Future<void> deleteAllCaches(String appId) async {
+    await _delete('/apps/$appId/caches');
+  }
+
+  // ── Environment variables ─────────────────────────────────────────────────
+
+  /// This endpoint answers with a bare array, unlike the rest of the API.
+  Future<List<CmVariable>> getVariables(String appId) async {
+    final list = await _getList('/apps/$appId/variables');
+    return list
+        .map((v) => CmVariable.fromJson(v as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> addVariable(String appId, CmVariable variable) async {
+    await _post('/apps/$appId/variables', variable.toJson());
+  }
+
+  Future<void> updateVariable(String appId, CmVariable variable) async {
+    await _put('/apps/$appId/variables/${variable.id}', variable.toJson());
+  }
+
+  Future<void> deleteVariable(String appId, String variableId) async {
+    await _delete('/apps/$appId/variables/$variableId');
   }
 
   // ── User ──────────────────────────────────────────────────────────────────
