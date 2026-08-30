@@ -14,9 +14,6 @@ jobs:
     permissions:
       contents: read
     env:
-      # Bumps every run so SideStore shows an Update rather than a reinstall.
-      APP_VERSION: 1.1.${{ github.run_number }}
-      BUILD_NUMBER: ${{ github.run_number }}
       STORE_SHARE_TOKEN: AKH743YcoJRnBHa # public share of /Builds on drive.huylv.tech
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +26,17 @@ jobs:
         run: |
           xcode-select -p
           xcodebuild -version
+
+      # Version comes from the commit count, not this runner's run_number.
+      # Codemagic can build the same repo, and two independent counters writing
+      # into one version space produce entries that go backwards. Commit count
+      # is monotonic and identical wherever it is computed.
+      - name: Derive version
+        run: |
+          N=$(git rev-list --count HEAD)
+          echo "APP_VERSION=1.1.$N" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=$N"    >> $GITHUB_ENV
+          echo "version -> 1.1.$N"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
