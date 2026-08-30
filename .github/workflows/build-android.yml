@@ -1,5 +1,6 @@
 name: Build Android
 
+# Manual only, by design — iOS is the sole auto-triggered platform.
 on:
   workflow_dispatch:
 

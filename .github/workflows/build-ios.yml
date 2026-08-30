@@ -1,6 +1,11 @@
 name: Build iOS
 
+# iOS builds automatically on every push to master — it is the only platform
+# wired that way, and each run publishes a new build to the SideStore source.
+# Every other platform is started by hand.
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
 
 jobs:
@@ -8,8 +13,17 @@ jobs:
     runs-on: macos-15
     permissions:
       contents: read
+    env:
+      # Bumps every run so SideStore shows an Update rather than a reinstall.
+      APP_VERSION: 1.1.${{ github.run_number }}
+      BUILD_NUMBER: ${{ github.run_number }}
+      STORE_SHARE_TOKEN: AKH743YcoJRnBHa # public share of /Builds on drive.huylv.tech
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the store changelog is built from the commits since
+          # the previously published build, which a shallow clone cannot reach.
+          fetch-depth: 0
 
       - name: Show Xcode version
         run: |
@@ -58,6 +72,7 @@ jobs:
 
       - name: Build iOS
         run: flutter build ios --release --no-codesign
+          --build-name=$APP_VERSION --build-number=$BUILD_NUMBER
 
       - name: Package IPA
         run: |
@@ -66,7 +81,29 @@ jobs:
           cp -R build/ios/iphoneos/Runner.app Payload/
           zip -r ignite.ipa Payload
 
-      - name: Upload IPA
+      # Publish to the Nextcloud store + update the SideStore source (apps.json).
+      - name: Publish to store
+        continue-on-error: true
+        env:
+          NC_USER: ${{ secrets.NC_USER }}
+          NC_APP_PASSWORD: ${{ secrets.NC_APP_PASSWORD }}
+          APP_SLUG: ignite
+          APP_NAME: Ignite
+          BUNDLE_ID: tech.huylv.ignite
+          DEV_NAME: huylv
+          VER: ${{ env.APP_VERSION }}
+          IPA_PATH: ignite.ipa
+          ICON_PATH: assets/icon/app_icon.png
+          # DESC is computed inside the script from git history — see there.
+          COMMIT_SHA: ${{ github.sha }}
+          SHARE_TOKEN: ${{ env.STORE_SHARE_TOKEN }}
+        run: |
+          if [ -z "$NC_USER" ] || [ -z "$NC_APP_PASSWORD" ]; then
+            echo "NC secrets not set — skipping store publish."; exit 0
+          fi
+          bash ci/update_store.sh
+
+      - name: Upload IPA (artifact fallback)
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa

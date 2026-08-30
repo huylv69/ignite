@@ -6,13 +6,7 @@ workflows:
     environment:
       flutter: 3.41.6
       java: 17
-    # triggering:
-    #   events:
-    #     - push
-    #   branch_patterns:
-    #     - pattern: main
-    #       include: true
-    #       source: true
+    # Manual only — start this from the Codemagic UI or the Ignite app.
     scripts:
       - name: Get Flutter packages
         script: |
@@ -36,16 +30,18 @@ workflows:
     max_build_duration: 60
     environment:
       vars:
-        BUNDLE_ID: "com.example.codemagic"
+        BUNDLE_ID: "tech.huylv.ignite"
       flutter: 3.41.6
       xcode: latest
-    # triggering:
-    #   events:
-    #     - push
-    #   branch_patterns:
-    #     - pattern: main
-    #       include: true
-    #       source: true
+    # iOS is the only platform that builds automatically; every other
+    # workflow here is started by hand.
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: master
+          include: true
+          source: true
     scripts:
       - name: Disable code signing completely
         script: |
