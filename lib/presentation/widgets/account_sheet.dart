@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/models/account_model.dart';
+import '../../core/models/app_model.dart';
 import '../../core/providers/accounts_provider.dart';
+import '../../core/providers/codemagic_provider.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Lets the signed-in accounts be switched, renamed, removed, or added to.
@@ -53,6 +56,7 @@ class AccountSheet extends ConsumerWidget {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
+            const _QuotaCard(),
             ...state.accounts.map(
               (a) => _AccountTile(
                 account: a,
@@ -246,4 +250,198 @@ class _AccountTile extends StatelessWidget {
 
   static String _initial(String name) =>
       name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+}
+
+/// Build minutes used against the account's monthly free allowance.
+///
+/// Codemagic has no quota endpoint — the numbers ride along on `GET /user`
+/// under `buildTimes` and `billing.usage`. It reports no period end date, so
+/// this deliberately promises no reset countdown.
+class _QuotaCard extends ConsumerWidget {
+  const _QuotaCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quota = ref.watch(quotaProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.bgElevated,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: quota.when(
+          data: (q) => _QuotaBody(quota: q),
+          loading:
+              () => const Row(
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 10),
+                  Text(
+                    'Reading build minutes…',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+          // `/user` carries the quota but sends no CORS headers, unlike /apps
+          // and /builds, so a browser can never read it. Say that instead of
+          // offering a Retry that cannot succeed.
+          error:
+              (e, _) => Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    kIsWeb ? Icons.public_off_rounded : Icons.error_outline,
+                    size: 15,
+                    color: AppTheme.textMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      kIsWeb
+                          ? 'Build minutes are not readable on the web — '
+                              "Codemagic's account endpoint blocks browsers."
+                          : 'Build minutes unavailable',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMuted,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  if (!kIsWeb) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => ref.invalidate(quotaProvider),
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(fontSize: 12, color: AppTheme.primary),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuotaBody extends StatelessWidget {
+  final CmQuota quota;
+  const _QuotaBody({required this.quota});
+
+  static String _mins(int seconds) {
+    final m = seconds ~/ 60;
+    if (m < 60) return '${m}m';
+    return '${m ~/ 60}h ${m % 60}m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!quota.hasLimit) {
+      return Text(
+        'This account has no free-tier build limit.',
+        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+      );
+    }
+
+    // Green until it matters, amber past three quarters, red at the edge.
+    final f = quota.fraction;
+    final tone =
+        f >= 0.9
+            ? AppTheme.error
+            : f >= 0.75
+            ? AppTheme.warning
+            : AppTheme.success;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.timer_outlined,
+              size: 15,
+              color: AppTheme.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Build minutes',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondary,
+                letterSpacing: 0.3,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${_mins(quota.remainingSeconds)} left',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: tone,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: f,
+            minHeight: 6,
+            backgroundColor: AppTheme.border,
+            valueColor: AlwaysStoppedAnimation<Color>(tone),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${_mins(quota.usedSeconds)} of ${_mins(quota.limitSeconds)} used'
+          '${quota.concurrency > 0 ? '  ·  ${quota.concurrency} concurrent build${quota.concurrency == 1 ? '' : 's'}' : ''}',
+          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+        ),
+        if (quota.byInstanceType.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children:
+                quota.byInstanceType.entries
+                    .map(
+                      (e) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.bgCard,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${e.key.replaceAll('_', ' ')} · ${_mins(e.value)}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+          ),
+        ],
+      ],
+    );
+  }
 }

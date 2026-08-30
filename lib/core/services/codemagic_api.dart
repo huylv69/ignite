@@ -296,6 +296,14 @@ class CodemagicApi {
     return await _get('/user');
   }
 
+  /// Build-minute quota for the account behind this token.
+  ///
+  /// There is no quota endpoint; the numbers ride along on `/user` under
+  /// `buildTimes` and `billing.usage`.
+  Future<CmQuota> getQuota() async {
+    return CmQuota.fromUserJson(await _get('/user'));
+  }
+
   // ── File-based workflow resolution ────────────────────────────────────────
 
   /// Resolves workflows for a file-based app via GitHub raw (public repos only).

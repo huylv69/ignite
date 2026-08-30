@@ -74,6 +74,9 @@ Verified by hand against the live API. Getting these wrong is silent:
   `status`, `branch` and `workflowId` all work.
 - **`GET /apps/:id/variables` returns a bare JSON array**, not an object — it
   needs a different decoder from every other endpoint.
+- **`GET /user` carries the build-minute quota** under `buildTimes` and
+  `billing.usage` — there is no quota endpoint. Like the step-log endpoint it
+  sends **no CORS headers**, so the web build cannot read it and says so.
 - **`GET /builds/:id/step/:stepId` returns `text/plain`**, not JSON. It is the
   only way to read build logs; there is no whole-build log endpoint. **It sends
   no CORS headers**, unlike `/apps` and `/builds`, so browsers cannot read it —

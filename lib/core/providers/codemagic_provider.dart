@@ -138,3 +138,10 @@ final latestBuildsProvider = FutureProvider<Map<String, CmBuild>>((ref) async {
   }
   return latest;
 });
+
+/// Build-minute quota for the active account.
+final quotaProvider = FutureProvider<CmQuota>((ref) async {
+  final api = ref.watch(codemagicApiProvider);
+  if (api == null) throw Exception('Not authenticated');
+  return api.getQuota();
+});

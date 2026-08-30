@@ -401,3 +401,67 @@ class BuildStats {
 
   double get successRate => total == 0 ? 0 : succeeded / total;
 }
+
+/// Build-minute quota for the signed-in account, from `GET /user`.
+///
+/// Codemagic reports seconds, and says nothing about when the monthly period
+/// rolls over — so this carries no reset date rather than inventing one.
+class CmQuota {
+  final int usedSeconds;
+  final int limitSeconds;
+  final int previousSeconds;
+  final int concurrency;
+
+  /// Seconds per machine type, e.g. `mac_mini_m2_free`. Only non-zero entries.
+  final Map<String, int> byInstanceType;
+
+  const CmQuota({
+    this.usedSeconds = 0,
+    this.limitSeconds = 0,
+    this.previousSeconds = 0,
+    this.concurrency = 0,
+    this.byInstanceType = const {},
+  });
+
+  factory CmQuota.fromUserJson(Map<String, dynamic> j) {
+    // Read defensively rather than casting: this walks five levels into a
+    // payload that exists to describe a user, not a quota, and a partial or
+    // reshaped response should degrade to zeros instead of throwing inside a
+    // provider.
+    Map<String, dynamic> m(dynamic v) =>
+        v is Map ? v.map((k, val) => MapEntry(k.toString(), val)) : const {};
+    int n(dynamic v) => v is num ? v.toInt() : 0;
+
+    final user = j['user'] is Map ? m(j['user']) : j;
+    final bt = m(user['buildTimes']);
+    final usage = m(m(user['billing'])['usage']);
+    final freeLimit = m(usage['freeLimit']);
+
+    final breakdown = <String, int>{};
+    m(m(usage['currentPeriod'])['buildTime']).forEach((k, v) {
+      final secs = n(v);
+      if (secs > 0) breakdown[k] = secs;
+    });
+
+    final monthly = n(bt['monthlyFreeBuildTimeLimit']);
+
+    return CmQuota(
+      usedSeconds: n(m(bt['currentPeriod'])['free']),
+      limitSeconds: monthly != 0 ? monthly : n(freeLimit['buildTime']),
+      previousSeconds: n(m(bt['previousPeriod'])['free']),
+      concurrency: n(freeLimit['concurrency']),
+      byInstanceType: breakdown,
+    );
+  }
+
+  int get remainingSeconds =>
+      limitSeconds == 0
+          ? 0
+          : (limitSeconds - usedSeconds).clamp(0, limitSeconds);
+
+  /// 0..1. Zero when the account has no free-tier limit at all.
+  double get fraction =>
+      limitSeconds == 0 ? 0 : (usedSeconds / limitSeconds).clamp(0.0, 1.0);
+
+  bool get hasLimit => limitSeconds > 0;
+}
