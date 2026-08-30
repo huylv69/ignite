@@ -29,6 +29,8 @@ workflows:
     instance_type: mac_mini_m1
     max_build_duration: 60
     environment:
+      groups:
+        - store          # NC_USER, NC_APP_PASSWORD for the SideStore publish
       vars:
         BUNDLE_ID: "tech.huylv.ignite"
       flutter: 3.41.6
@@ -65,7 +67,12 @@ workflows:
           flutter packages pub get
       - name: Flutter build iOS
         script: |
+          # The store keys each release by marketing version, so it has to
+          # move every build or SideStore shows a reinstall instead of an
+          # update. VER below must match what is stamped here.
           flutter build ios --release --no-codesign \
+            --build-name="1.1.${BUILD_NUMBER:-0}" \
+            --build-number="${BUILD_NUMBER:-0}" \
             --dart-define=FLUTTER_XCODE_CODE_SIGNING_ALLOWED=NO \
             --dart-define=FLUTTER_XCODE_CODE_SIGNING_REQUIRED=NO \
             -v
@@ -75,6 +82,24 @@ workflows:
           mkdir Payload
           cp -r Runner.app Payload/
           zip -q -r -y unsigned_ignite.ipa Payload/
+      # Publishes to the Nextcloud store and rewrites the shared SideStore
+      # source, so the phone gets an Update prompt. Never fail the build over
+      # it — the .ipa is still attached as an artifact either way.
+      - name: Publish to SideStore source
+        ignore_failure: true
+        script: |
+          if [ -z "${NC_USER:-}" ] || [ -z "${NC_APP_PASSWORD:-}" ]; then
+            echo "NC secrets not set - skipping store publish."; exit 0
+          fi
+          export APP_SLUG=ignite
+          export APP_NAME=Ignite
+          export BUNDLE_ID=tech.huylv.ignite
+          export DEV_NAME=huylv
+          export VER="1.1.${BUILD_NUMBER:-0}"
+          export IPA_PATH=build/ios/iphoneos/unsigned_ignite.ipa
+          export ICON_PATH=assets/icon/app_icon.png
+          export SHARE_TOKEN=AKH743YcoJRnBHa
+          bash ci/update_store.sh
     artifacts:
       - build/ios/iphoneos/unsigned_ignite.ipa
     publishing:

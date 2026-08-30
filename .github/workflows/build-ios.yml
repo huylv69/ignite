@@ -1,11 +1,9 @@
 name: Build iOS
 
-# iOS builds automatically on every push to master — it is the only platform
-# wired that way, and each run publishes a new build to the SideStore source.
-# Every other platform is started by hand.
+# Manual only. iOS builds automatically on Codemagic instead (see
+# codemagic.yaml) — macOS minutes here are exhausted, so an auto-trigger
+# would just queue runs that cannot start. Kept as a working fallback.
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
 
 jobs:
