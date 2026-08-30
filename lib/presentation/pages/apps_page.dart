@@ -10,6 +10,7 @@ import '../../core/providers/accounts_provider.dart';
 import '../../core/providers/app_info_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../widgets/account_sheet.dart';
+import '../widgets/ignite_mark.dart';
 import '../widgets/skeletons.dart';
 
 class AppsPage extends ConsumerStatefulWidget {
@@ -44,68 +45,40 @@ class _AppsPageState extends ConsumerState<AppsPage> {
         child: CustomScrollView(
           slivers: [
             SliverAppBar(
-              // 120 for the branded header plus the 56 the search field below
-              // it occupies, otherwise the title collides with the search bar.
-              expandedHeight: 176,
-              floating: false,
+              // The brand sits on the toolbar row itself, level with the
+              // account and about buttons. It used to live in a
+              // FlexibleSpaceBar title, which parks it at the bottom of the
+              // expanded bar — a whole row below the actions it belongs beside.
               pinned: true,
               backgroundColor: AppTheme.bg,
-              flexibleSpace: FlexibleSpaceBar(
-                // The bottom 72 clears the 56pt search field plus its 16pt gap; a
-                // FlexibleSpaceBar measures its title from the very bottom of
-                // the app bar, `bottom` widget included.
-                titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 72),
-                title: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppTheme.primaryLight, AppTheme.primaryDark],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primary.withValues(alpha: 0.4),
-                            blurRadius: 8,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.local_fire_department_rounded,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Ignite',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ],
-                ),
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppTheme.primary.withValues(alpha: 0.06),
-                        AppTheme.bg,
-                      ],
-                    ),
+              titleSpacing: 16,
+              flexibleSpace: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppTheme.primary.withValues(alpha: 0.06),
+                      AppTheme.bg,
+                    ],
                   ),
                 ),
+              ),
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const IgniteTile(size: 30),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Ignite',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
               ),
               actions: [
                 _AccountButton(
@@ -460,28 +433,7 @@ class _InfoSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           // App icon + name
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              gradient: const RadialGradient(
-                colors: [AppTheme.primaryLight, AppTheme.primaryDark],
-              ),
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withValues(alpha: 0.35),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.local_fire_department_rounded,
-              size: 34,
-              color: Colors.white,
-            ),
-          ),
+          const IgniteTile(size: 64),
           const SizedBox(height: 14),
           const Text(
             'Ignite',

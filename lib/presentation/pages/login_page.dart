@@ -6,6 +6,7 @@ import '../../core/providers/accounts_provider.dart';
 import '../../core/providers/biometric_provider.dart';
 import '../../core/services/codemagic_api.dart';
 import '../../core/theme/app_theme.dart';
+import '../widgets/ignite_mark.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   /// When true the page is adding a second account rather than signing in for
@@ -136,31 +137,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 children: [
                   // Logo
                   Center(
-                    child: Container(
-                          width: 88,
-                          height: 88,
-                          decoration: BoxDecoration(
-                            gradient: const RadialGradient(
-                              colors: [
-                                AppTheme.primaryLight,
-                                AppTheme.primaryDark,
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primary.withValues(alpha: 0.4),
-                                blurRadius: 24,
-                                spreadRadius: 4,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.local_fire_department_rounded,
-                            size: 48,
-                            color: Colors.white,
-                          ),
-                        )
+                    child: const IgniteTile(size: 88)
                         .animate(onPlay: (c) => c.repeat(reverse: true))
                         .scaleXY(
                           begin: 0.96,

@@ -7,6 +7,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../core/models/app_model.dart';
 import '../../core/providers/codemagic_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../widgets/ignite_mark.dart';
 import '../widgets/build_detail_sheet.dart';
 import 'caches_page.dart';
 import 'variables_page.dart';
@@ -347,9 +348,10 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage>
                               strokeWidth: 2,
                             ),
                           )
-                          : const Icon(
-                            Icons.local_fire_department_rounded,
+                          : const IgniteMark(
+                            size: 20,
                             color: Colors.white,
+                            core: false,
                           ),
                   label: const Text(
                     'Start Build',

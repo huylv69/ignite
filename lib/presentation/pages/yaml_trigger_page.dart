@@ -6,6 +6,7 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/providers/codemagic_provider.dart';
 import '../../core/services/workflow_cache.dart';
 import '../../core/theme/app_theme.dart';
+import '../widgets/ignite_mark.dart';
 
 // ── Parsed workflow from codemagic.yaml ───────────────────────────────────────
 
@@ -625,9 +626,10 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
                             strokeWidth: 2,
                           ),
                         )
-                        : const Icon(
-                          Icons.local_fire_department_rounded,
+                        : const IgniteMark(
+                          size: 20,
                           color: Colors.white,
+                          core: false,
                         ),
                 label: Text(
                   _isTriggering
