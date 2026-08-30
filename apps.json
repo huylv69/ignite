@@ -1,0 +1,195 @@
+{
+  "name": "HuyLV Official",
+  "identifier": "tech.huylv.store",
+  "apps": [
+    {
+      "name": "VocabLoop",
+      "bundleIdentifier": "tech.huylv.vocabloop",
+      "developerName": "huylv",
+      "localizedDescription": "VocabLoop",
+      "versions": [
+        {
+          "version": "1.0.73",
+          "date": "2026-08-30",
+          "size": 10060498,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/vocabloop/ios/vocabloop-1.0.73.ipa",
+          "localizedDescription": "• Fix the Lock Screen / Dynamic Island card freezing on one old word",
+          "commit": "aa7efbed6f8d135e3b249b49be314239044bab8a"
+        },
+        {
+          "version": "1.0.72",
+          "date": "2026-08-17",
+          "size": 10060838,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/vocabloop/ios/vocabloop-1.0.72.ipa",
+          "localizedDescription": "• Make screenshot-translate one press: Action Button opens straight to it",
+          "commit": "c5c8e005093f66dad30ca7172f3b1fb6ea14df22"
+        },
+        {
+          "version": "1.0.71",
+          "date": "2026-08-17",
+          "size": 10007858,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/vocabloop/ios/vocabloop-1.0.71.ipa",
+          "localizedDescription": "• Add a tap-to-translate screenshot extension — the iPhone answer to S-Pen",
+          "commit": "cdb7a272768e37538a1b9eb872d1d5f66bed823e"
+        },
+        {
+          "version": "1.0.70",
+          "date": "2026-08-13",
+          "size": 9963745,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/vocabloop/ios/vocabloop-1.0.70.ipa",
+          "localizedDescription": "• Read the clipboard image more widely, and prefer the passed image",
+          "commit": "0b6faff026ad27cc308555120d99ecf8985bd98b"
+        },
+        {
+          "version": "1.0.69",
+          "date": "2026-08-13",
+          "size": 9963364,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/vocabloop/ios/vocabloop-1.0.69.ipa",
+          "localizedDescription": "• Name 47 banks in the VietQR map, not 9",
+          "commit": "2b8cc73eb426346ae4cfe3fe76369fe42d479ebb"
+        },
+        {
+          "version": "1.0.68",
+          "date": "2026-08-13",
+          "size": 9962698,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/vocabloop/ios/vocabloop-1.0.68.ipa",
+          "localizedDescription": "• Stop the QR copy from crying wolf: drop the unverifiable read-back",
+          "commit": "c00374241ef64b8c6634c6deff42b6d1fb95a461"
+        }
+      ],
+      "iconURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/vocabloop/icon.png",
+      "version": "1.0.73",
+      "versionDate": "2026-08-30",
+      "versionDescription": "• Fix the Lock Screen / Dynamic Island card freezing on one old word",
+      "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/vocabloop/ios/vocabloop-1.0.73.ipa",
+      "size": 10060498
+    },
+    {
+      "name": "Pheem",
+      "bundleIdentifier": "com.pheem.app",
+      "developerName": "huylv",
+      "localizedDescription": "Pheem",
+      "versions": [
+        {
+          "version": "1.0.102",
+          "date": "2026-08-30",
+          "size": 4968127,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/pheem/ios/pheem-1.0.102.ipa",
+          "localizedDescription": "• Codemagic: this account has no Linux instances\n• Codemagic: the version was losing its prefix, and the changelog its history\n• Subtitles: find them by name too, tell the two apart, and let them be nudged\n• Add a Codemagic pipeline for when Actions will not start\n• Put the settings back on the player, this time inside it\n• Subtitles on every surface, and the sheet back inside the player\n• Subtitles the app finds for you\n• Admin died on the correct passcode, and Safari would not get out of the way\n• Phone: give the height back to the thing you came to watch",
+          "commit": "5ea3ccdb03e701d48b5a5d1309409fdeec248ea5"
+        },
+        {
+          "version": "1.0.84",
+          "date": "2026-08-29",
+          "size": 4965175,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/pheem/ios/pheem-1.0.84.ipa",
+          "localizedDescription": "• Write up the aggregation idea, and what in it is actually buildable\n• Admin: four groups instead of one long scroll, and a keypad with three columns\n• Live TV: the browse grid walks like the player's\n• TV: a row ends at its group, the hero gives back a strip, and Left lands on where you are\n• TV: the focus scroller only ever moved sideways\n• Live TV: browse straight through the grid, and stop the rails fighting for room\n• Live TV: the ISP is a source, not a group name — and three fixes behind it\n• Write down how a release actually happens",
+          "commit": "bdeb19089ed7ae89a7904c1d6e3c4655105a202f"
+        },
+        {
+          "version": "1.0.83",
+          "date": "2026-08-29",
+          "size": 4961739,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/pheem/ios/pheem-1.0.83.ipa",
+          "localizedDescription": "• Worker parses the playlists, and parses them correctly\n• TV home: cards sized for the room, and the live rail actually renders\n• Live TV: the panel gets its source picker, and sizes for the sofa\n• Live TV: the channel list as a panel you can see past\n• webOS: the app's own tile, a full-screen channel list, and Back one rung at a time\n• Live TV: rows you can pick from, a name where there is no logo, full quality\n• Live TV: five per row, Back to the list, and say when a source is loading\n• Live TV: pick a source, and the rail below becomes its groups\n• Live TV: one rail for sources, one for the built-in list\n• webOS: the layout, the grids and the keyboard it already had\n• Sources are a settings list, and they fold away\n• Nine ready-made lists, one press each",
+          "commit": "2fa6bd9aade813eccf3b538b422b70073c1807c3"
+        },
+        {
+          "version": "1.0.82",
+          "date": "2026-08-28",
+          "size": 4948230,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/pheem/ios/pheem-1.0.82.ipa",
+          "localizedDescription": "• Paste an IPTV link and get its groups, not just its channels\n• Don't ask about films nobody is looking at yet",
+          "commit": "2eb17b77e4a6583656b6d272ef3a91c184a61670"
+        },
+        {
+          "version": "1.0.81",
+          "date": "2026-08-25",
+          "size": 4943217,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/pheem/ios/pheem-1.0.81.ipa",
+          "localizedDescription": "• A trailer that cannot play leaves the artwork alone",
+          "commit": "80ffb81a340b55a0d928989f3e646ac093f6cc93"
+        },
+        {
+          "version": "1.0.80",
+          "date": "2026-08-25",
+          "size": 4942304,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/pheem/ios/pheem-1.0.80.ipa",
+          "localizedDescription": "• Scroll position is ours to restore, not WebKit's",
+          "commit": "35201896ac28aaf79e4b12d5ddf7213629218ff8"
+        }
+      ],
+      "version": "1.0.102",
+      "versionDate": "2026-08-30",
+      "versionDescription": "• Codemagic: this account has no Linux instances\n• Codemagic: the version was losing its prefix, and the changelog its history\n• Subtitles: find them by name too, tell the two apart, and let them be nudged\n• Add a Codemagic pipeline for when Actions will not start\n• Put the settings back on the player, this time inside it\n• Subtitles on every surface, and the sheet back inside the player\n• Subtitles the app finds for you\n• Admin died on the correct passcode, and Safari would not get out of the way\n• Phone: give the height back to the thing you came to watch",
+      "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/pheem/ios/pheem-1.0.102.ipa",
+      "size": 4968127,
+      "iconURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/pheem/icon.png"
+    },
+    {
+      "name": "Monvy",
+      "bundleIdentifier": "com.monvy.monvy",
+      "developerName": "huylv",
+      "localizedDescription": "Monvy",
+      "versions": [
+        {
+          "version": "1.0.85",
+          "date": "2026-08-14",
+          "size": 15873831,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/monvy/ios/monvy-1.0.85.ipa",
+          "localizedDescription": "• feat(downloader): cõi \"Tải video\" — nhúng dl.huylv.tech\n• Store: real changelogs, dead-link pruning, and a 50-build file cap\n• fix(reminders): lịch âm/dương tái diễn khớp đúng ngày (bug mùng-1 bắn nhầm âm 29)",
+          "commit": "ab0730fcbfba780b86e7e7d2b21acf071b048ebf"
+        },
+        {
+          "version": "1.0.84",
+          "date": "2026-08-12",
+          "size": 15869970,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/monvy/ios/monvy-1.0.84.ipa",
+          "localizedDescription": "CI build 1.0.84"
+        },
+        {
+          "version": "1.0.83",
+          "date": "2026-08-04",
+          "size": 15821753,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/monvy/ios/monvy-1.0.83.ipa",
+          "localizedDescription": "CI build 1.0.83"
+        },
+        {
+          "version": "1.0.82",
+          "date": "2026-07-23",
+          "size": 15783591,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/monvy/ios/monvy-1.0.82.ipa",
+          "localizedDescription": "CI build 1.0.82"
+        }
+      ],
+      "version": "1.0.85",
+      "versionDate": "2026-08-14",
+      "versionDescription": "• feat(downloader): cõi \"Tải video\" — nhúng dl.huylv.tech\n• Store: real changelogs, dead-link pruning, and a 50-build file cap\n• fix(reminders): lịch âm/dương tái diễn khớp đúng ngày (bug mùng-1 bắn nhầm âm 29)",
+      "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/monvy/ios/monvy-1.0.85.ipa",
+      "size": 15873831,
+      "iconURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/monvy/icon.png"
+    },
+    {
+      "name": "Ignite",
+      "bundleIdentifier": "tech.huylv.ignite",
+      "developerName": "huylv",
+      "localizedDescription": "Ignite",
+      "versions": [
+        {
+          "version": "1.1.4",
+          "date": "2026-08-30",
+          "size": 7705340,
+          "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/ignite/ios/ignite-1.1.4.ipa",
+          "localizedDescription": "• Build and publish iOS from Codemagic instead of GitHub Actions\n• Ship Ignite under its own bundle id and publish iOS builds to the store\n• Stop tracking the unrelated Eclipse workspace directory",
+          "commit": "55cb06b85c2ae9803524be23166a870825071a42"
+        }
+      ],
+      "iconURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/ignite/icon.png",
+      "version": "1.1.4",
+      "versionDate": "2026-08-30",
+      "versionDescription": "• Build and publish iOS from Codemagic instead of GitHub Actions\n• Ship Ignite under its own bundle id and publish iOS builds to the store\n• Stop tracking the unrelated Eclipse workspace directory",
+      "downloadURL": "https://drive.huylv.tech/public.php/dav/files/AKH743YcoJRnBHa/ignite/ios/ignite-1.1.4.ipa",
+      "size": 7705340
+    }
+  ]
+}

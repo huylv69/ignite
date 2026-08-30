@@ -35,15 +35,9 @@ workflows:
         BUNDLE_ID: "tech.huylv.ignite"
       flutter: 3.41.6
       xcode: latest
-    # iOS is the only platform that builds automatically; every other
-    # workflow here is started by hand.
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: master
-          include: true
-          source: true
+    # Manual only, like every workflow here — automatic iOS builds run on
+    # GitHub Actions instead. Start this from the Codemagic UI, the Ignite
+    # app, or POST /builds.
     scripts:
       - name: Disable code signing completely
         script: |

@@ -1,0 +1,47 @@
+
+        <!DOCTYPE html>
+            <html>
+                
+          <head>
+            <title>Codemagic API</title>
+            <link rel='icon' type='image/png' href='https://cdn.jsdelivr.net/gh/litestar-org/branding@main/assets/Branding%20-%20PNG%20-%20Transparent/Badge%20-%20Blue%20and%20Yellow.png'>
+            <meta charset="utf-8"/>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/litestar-org/branding@main/assets/openapi/scalar.css">
+            <style>body { margin: 0; padding: 0 }</style>
+            <style>
+              :root { --scalar-custom-header-height: 50px; }
+              .custom-header {
+                height: var(--scalar-custom-header-height);
+                background-color: var(--scalar-background-2);
+                color: var(--scalar-color-1);
+                padding: 0 18px;
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+              }
+              .custom-header img { height: 28px; }
+              .custom-header span { font-size: var(--scalar-font-size-2); font-weight: 600; }
+            </style>
+          </head>
+        
+                
+          <body>
+            <header class="custom-header scalar-app">
+              <img alt="Codemagic API" src="https://codemagic.io/media/landing/press-kit/svg/star-gradient.svg">
+              <span>Codemagic API</span>
+            </header>
+            <script id="api-reference" data-url="/api/v3/schema/openapi.json"></script>
+            
+                <script>
+                  document.getElementById('api-reference').dataset.configuration = '{"metaData":{"ogImage":"https://codemagic.io/media/landing/press-kit/svg/star-gradient.svg"},"hideModels":true,"hideClientButton":true,"favicon":"https://codemagic.io/favicon.ico"}'
+                </script>
+                
+            <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@latest" crossorigin></script>
+          </body>
+        
+            </html>
+        

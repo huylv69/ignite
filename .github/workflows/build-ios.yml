@@ -1,9 +1,11 @@
 name: Build iOS
 
-# Manual only. iOS builds automatically on Codemagic instead (see
-# codemagic.yaml) — macOS minutes here are exhausted, so an auto-trigger
-# would just queue runs that cannot start. Kept as a working fallback.
+# iOS is the only platform that builds automatically, and this is the only
+# place it does: every Codemagic workflow is manual. Each run also publishes
+# to the SideStore source.
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
 
 jobs:
