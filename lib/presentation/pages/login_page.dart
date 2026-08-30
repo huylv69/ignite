@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../core/providers/auth_provider.dart';
 import '../../core/providers/accounts_provider.dart';
 import '../../core/providers/biometric_provider.dart';
 import '../../core/services/codemagic_api.dart';

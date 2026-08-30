@@ -219,8 +219,9 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
     await WorkflowCache.remove(prefs, widget.app.id, wf.id);
     setState(() {
       _workflows = _workflows.where((w) => w.id != wf.id).toList();
-      if (_selected?.id == wf.id)
+      if (_selected?.id == wf.id) {
         _selected = _workflows.isNotEmpty ? _workflows.first : null;
+      }
     });
   }
 

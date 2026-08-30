@@ -64,8 +64,9 @@ class _LockPageState extends ConsumerState<LockPage>
         setState(() => _error = 'Authentication cancelled');
       }
     } on Exception catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _authenticating = false);
     }

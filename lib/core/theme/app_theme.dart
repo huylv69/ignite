@@ -25,87 +25,91 @@ class AppTheme {
   static const Color textMuted = Color(0xFF606080);
 
   static ThemeData get dark => ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: bg,
-        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
-          titleLarge: GoogleFonts.inter(color: textPrimary, fontSize: 20, fontWeight: FontWeight.w600),
-        ),
-        colorScheme: const ColorScheme.dark(
-          primary: primary,
-          secondary: accent,
-          surface: bgCard,
-          error: error,
-          onPrimary: Colors.white,
-          onSecondary: Colors.black,
-          onSurface: textPrimary,
-        ),
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: false,
-          titleTextStyle: GoogleFonts.inter(
-            color: textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
-          iconTheme: const IconThemeData(color: textPrimary),
-        ),
-        cardTheme: CardThemeData(
-          color: bgCard,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: border, width: 1),
-          ),
-        ),
-        tabBarTheme: TabBarThemeData(
-          indicatorColor: primary,
-          labelColor: primary,
-          unselectedLabelColor: textSecondary,
-          labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
-          unselectedLabelStyle: GoogleFonts.inter(fontSize: 13),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: bgElevated,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: border),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: primary, width: 2),
-          ),
-          labelStyle: const TextStyle(color: textSecondary),
-          hintStyle: const TextStyle(color: textMuted),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primary,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-        ),
-        chipTheme: ChipThemeData(
-          backgroundColor: bgElevated,
-          labelStyle: GoogleFonts.inter(color: textSecondary, fontSize: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          side: const BorderSide(color: border),
-        ),
-        dividerTheme: const DividerThemeData(color: border, thickness: 1),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: bgCard,
-          selectedItemColor: primary,
-          unselectedItemColor: textMuted,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-        ),
-      );
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    scaffoldBackgroundColor: bg,
+    textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
+      titleLarge: GoogleFonts.inter(
+        color: textPrimary,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    colorScheme: const ColorScheme.dark(
+      primary: primary,
+      secondary: accent,
+      surface: bgCard,
+      error: error,
+      onPrimary: Colors.white,
+      onSecondary: Colors.black,
+      onSurface: textPrimary,
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: false,
+      titleTextStyle: GoogleFonts.inter(
+        color: textPrimary,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+      ),
+      iconTheme: const IconThemeData(color: textPrimary),
+    ),
+    cardTheme: CardThemeData(
+      color: bgCard,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: border, width: 1),
+      ),
+    ),
+    tabBarTheme: TabBarThemeData(
+      indicatorColor: primary,
+      labelColor: primary,
+      unselectedLabelColor: textSecondary,
+      labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
+      unselectedLabelStyle: GoogleFonts.inter(fontSize: 13),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: bgElevated,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primary, width: 2),
+      ),
+      labelStyle: const TextStyle(color: textSecondary),
+      hintStyle: const TextStyle(color: textMuted),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: bgElevated,
+      labelStyle: GoogleFonts.inter(color: textSecondary, fontSize: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      side: const BorderSide(color: border),
+    ),
+    dividerTheme: const DividerThemeData(color: border, thickness: 1),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: bgCard,
+      selectedItemColor: primary,
+      unselectedItemColor: textMuted,
+      type: BottomNavigationBarType.fixed,
+      elevation: 0,
+    ),
+  );
 }
