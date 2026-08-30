@@ -337,15 +337,39 @@ class _QuotaCard extends ConsumerWidget {
   }
 }
 
+/// Codemagic sells this allowance as "500 build minutes a month", so the
+/// card counts in minutes too. Rendering 30000s as "8h 20m" was accurate and
+/// useless — it made the reader convert back to the unit they were given.
+String quotaMinutes(int seconds) => '${seconds ~/ 60}';
+
+/// `mac_mini_m2_free` is a billing key, not a label. Split the machine from
+/// the bucket and say the machine in words.
+String quotaMachineLabel(String key) {
+  var k = key;
+  var bucket = '';
+  for (final b in ['_free', '_paid', '_personal']) {
+    if (k.endsWith(b)) {
+      bucket = b.substring(1);
+      k = k.substring(0, k.length - b.length);
+      break;
+    }
+  }
+  const names = {
+    'mac_mini_m1': 'Mac mini M1',
+    'mac_mini_m2': 'Mac mini M2',
+    'mac_mini_m4': 'Mac mini M4',
+    'linux_x2': 'Linux x2',
+    'windows_x2': 'Windows x2',
+  };
+  final name = names[k] ?? k.replaceAll('_', ' ');
+  // The free bucket is the whole context of this card; only a paid or
+  // personal one is worth calling out.
+  return bucket.isEmpty || bucket == 'free' ? name : '$name ($bucket)';
+}
+
 class _QuotaBody extends StatelessWidget {
   final CmQuota quota;
   const _QuotaBody({required this.quota});
-
-  static String _mins(int seconds) {
-    final m = seconds ~/ 60;
-    if (m < 60) return '${m}m';
-    return '${m ~/ 60}h ${m % 60}m';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -387,7 +411,7 @@ class _QuotaBody extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              '${_mins(quota.remainingSeconds)} left',
+              '${quota.remainingMinutes} min left',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -408,11 +432,12 @@ class _QuotaBody extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '${_mins(quota.usedSeconds)} of ${_mins(quota.limitSeconds)} used'
+          '${quota.usedMinutes} of ${quota.limitMinutes} min used'
           '${quota.concurrency > 0 ? '  ·  ${quota.concurrency} concurrent build${quota.concurrency == 1 ? '' : 's'}' : ''}',
           style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
         ),
-        if (quota.byInstanceType.isNotEmpty) ...[
+        // With a single machine type the chips just restate the line above.
+        if (quota.byInstanceType.length > 1) ...[
           const SizedBox(height: 8),
           Wrap(
             spacing: 6,
@@ -430,7 +455,7 @@ class _QuotaBody extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '${e.key.replaceAll('_', ' ')} · ${_mins(e.value)}',
+                          '${quotaMachineLabel(e.key)} · ${quotaMinutes(e.value)}m',
                           style: const TextStyle(
                             fontSize: 10,
                             color: AppTheme.textMuted,

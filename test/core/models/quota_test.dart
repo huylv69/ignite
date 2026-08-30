@@ -30,7 +30,9 @@ void main() {
     expect(q.usedSeconds, 1258);
     expect(q.limitSeconds, 30000);
     expect(q.concurrency, 1);
-    expect(q.remainingSeconds, 28742);
+    expect(q.usedMinutes, 21);   // 1258s = 20.97 min, and a started minute counts
+    expect(q.limitMinutes, 500);
+    expect(q.remainingMinutes, 479);
   });
 
   test('drops machine types that consumed nothing', () {
@@ -46,7 +48,7 @@ void main() {
     final q = CmQuota.fromUserJson({'user': {}});
     expect(q.hasLimit, isFalse);
     expect(q.fraction, 0);
-    expect(q.remainingSeconds, 0);
+    expect(q.remainingMinutes, 0);
   });
 
   test('overspending clamps instead of going negative', () {
@@ -58,7 +60,7 @@ void main() {
         },
       },
     });
-    expect(q.remainingSeconds, 0);
+    expect(q.remainingMinutes, 0);
     expect(q.fraction, 1.0);
   });
 
@@ -72,6 +74,21 @@ void main() {
       },
     });
     expect(q.limitSeconds, 600);
-    expect(q.remainingSeconds, 540);
+    expect(q.limitMinutes, 10);
+    expect(q.remainingMinutes, 9); // 60s used = 1 min of a 10-minute limit
+  });
+
+  test('used and remaining always add up to the limit', () {
+    // The card shows all three at once. Flooring each from the raw seconds
+    // independently made 20 + 479 = 499 against a 500 limit, which is what
+    // "7h59m left" was really reporting.
+    for (final used in [0, 1, 59, 60, 61, 1258, 29999, 30000, 31000]) {
+      final q = CmQuota(usedSeconds: used, limitSeconds: 30000);
+      expect(
+        q.usedMinutes.clamp(0, q.limitMinutes) + q.remainingMinutes,
+        q.limitMinutes,
+        reason: 'broke at $used seconds used',
+      );
+    }
   });
 }

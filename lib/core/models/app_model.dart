@@ -454,10 +454,19 @@ class CmQuota {
     );
   }
 
-  int get remainingSeconds =>
+  /// Minutes consumed, rounded up: a build that ran 61 seconds has eaten into
+  /// a second minute, and Codemagic bills it that way.
+  int get usedMinutes => (usedSeconds / 60).ceil();
+
+  int get limitMinutes => limitSeconds ~/ 60;
+
+  /// Derived from [usedMinutes], not from the raw seconds, so the three numbers
+  /// the card shows always reconcile. Flooring each independently lost a
+  /// minute: 20 used + 479 left did not add up to 500.
+  int get remainingMinutes =>
       limitSeconds == 0
           ? 0
-          : (limitSeconds - usedSeconds).clamp(0, limitSeconds);
+          : (limitMinutes - usedMinutes).clamp(0, limitMinutes);
 
   /// 0..1. Zero when the account has no free-tier limit at all.
   double get fraction =>
