@@ -14,7 +14,8 @@ class LockPage extends ConsumerStatefulWidget {
   ConsumerState<LockPage> createState() => _LockPageState();
 }
 
-class _LockPageState extends ConsumerState<LockPage> with WidgetsBindingObserver {
+class _LockPageState extends ConsumerState<LockPage>
+    with WidgetsBindingObserver {
   bool _authenticating = false;
   String? _error;
 
@@ -42,7 +43,10 @@ class _LockPageState extends ConsumerState<LockPage> with WidgetsBindingObserver
 
   Future<void> _authenticate() async {
     if (_authenticating) return;
-    setState(() { _authenticating = true; _error = null; });
+    setState(() {
+      _authenticating = true;
+      _error = null;
+    });
 
     final auth = ref.read(localAuthProvider);
     try {
@@ -60,7 +64,8 @@ class _LockPageState extends ConsumerState<LockPage> with WidgetsBindingObserver
         setState(() => _error = 'Authentication cancelled');
       }
     } on Exception catch (e) {
-      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted)
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _authenticating = false);
     }
@@ -76,28 +81,36 @@ class _LockPageState extends ConsumerState<LockPage> with WidgetsBindingObserver
       body: Stack(
         children: [
           Positioned(
-            top: -120, left: -80,
+            top: -120,
+            left: -80,
             child: Container(
-              width: 340, height: 340,
+              width: 340,
+              height: 340,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [
-                  AppTheme.primary.withValues(alpha: 0.15),
-                  Colors.transparent,
-                ]),
+                gradient: RadialGradient(
+                  colors: [
+                    AppTheme.primary.withValues(alpha: 0.15),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
           ),
           Positioned(
-            bottom: -80, right: -60,
+            bottom: -80,
+            right: -60,
             child: Container(
-              width: 260, height: 260,
+              width: 260,
+              height: 260,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [
-                  AppTheme.accent.withValues(alpha: 0.10),
-                  Colors.transparent,
-                ]),
+                gradient: RadialGradient(
+                  colors: [
+                    AppTheme.accent.withValues(alpha: 0.10),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
           ),
@@ -109,35 +122,54 @@ class _LockPageState extends ConsumerState<LockPage> with WidgetsBindingObserver
                 children: [
                   // Lock icon
                   Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      gradient: const RadialGradient(
-                        colors: [AppTheme.primaryLight, AppTheme.primaryDark],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primary.withValues(alpha: 0.4),
-                          blurRadius: 24,
-                          spreadRadius: 4,
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          gradient: const RadialGradient(
+                            colors: [
+                              AppTheme.primaryLight,
+                              AppTheme.primaryDark,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primary.withValues(alpha: 0.4),
+                              blurRadius: 24,
+                              spreadRadius: 4,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: const Icon(Icons.lock_rounded, size: 44, color: Colors.white),
-                  )
+                        child: const Icon(
+                          Icons.lock_rounded,
+                          size: 44,
+                          color: Colors.white,
+                        ),
+                      )
                       .animate(onPlay: (c) => c.repeat(reverse: true))
-                      .scaleXY(begin: 0.96, end: 1.04, duration: 2400.ms, curve: Curves.easeInOut),
+                      .scaleXY(
+                        begin: 0.96,
+                        end: 1.04,
+                        duration: 2400.ms,
+                        curve: Curves.easeInOut,
+                      ),
                   const SizedBox(height: 32),
                   const Text(
                     'Ignite',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
                   ).animate().fadeIn(delay: 100.ms),
                   const SizedBox(height: 8),
                   const Text(
                     'Verify your identity to continue',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                    ),
                   ).animate().fadeIn(delay: 200.ms),
                   const SizedBox(height: 48),
 
@@ -150,14 +182,34 @@ class _LockPageState extends ConsumerState<LockPage> with WidgetsBindingObserver
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         disabledBackgroundColor: AppTheme.bgCard,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
-                      icon: _authenticating
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Icon(Icons.fingerprint, color: Colors.white, size: 22),
+                      icon:
+                          _authenticating
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Icon(
+                                Icons.fingerprint,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                       label: Text(
-                        _authenticating ? 'Verifying…' : 'Unlock with Biometrics',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                        _authenticating
+                            ? 'Verifying…'
+                            : 'Unlock with Biometrics',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
                   ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
@@ -167,7 +219,10 @@ class _LockPageState extends ConsumerState<LockPage> with WidgetsBindingObserver
                     Text(
                       _error!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppTheme.error, fontSize: 13),
+                      style: const TextStyle(
+                        color: AppTheme.error,
+                        fontSize: 13,
+                      ),
                     ).animate().fadeIn(),
                   ],
 
