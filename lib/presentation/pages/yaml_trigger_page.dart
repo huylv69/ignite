@@ -48,7 +48,11 @@ class YamlTriggerPage extends ConsumerStatefulWidget {
   final CmApplication app;
   final List<CmWorkflow> workflows;
 
-  const YamlTriggerPage({super.key, required this.app, required this.workflows});
+  const YamlTriggerPage({
+    super.key,
+    required this.app,
+    required this.workflows,
+  });
 
   @override
   ConsumerState<YamlTriggerPage> createState() => _YamlTriggerPageState();
@@ -62,8 +66,22 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
   String? _loadingBranch; // guard against stale responses
   bool _isTriggering = false;
 
+  /// The API accepts a branch or a tag, never both.
+  bool _useTag = false;
+  String? _instanceType;
+
   final _addController = TextEditingController();
+  final _tagController = TextEditingController();
   bool _showAddField = false;
+
+  /// Machine types Codemagic exposes. A null selection lets the workflow's own
+  /// configuration decide.
+  static const _instanceTypes = <String>[
+    'mac_mini_m1',
+    'mac_mini_m2',
+    'linux_x2',
+    'windows_x2',
+  ];
 
   @override
   void initState() {
@@ -75,6 +93,7 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
   @override
   void dispose() {
     _addController.dispose();
+    _tagController.dispose();
     super.dispose();
   }
 
@@ -82,7 +101,11 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
 
   Future<void> _loadWorkflows() async {
     final requestBranch = _branch;
-    setState(() { _loading = true; _yamlError = null; _loadingBranch = requestBranch; });
+    setState(() {
+      _loading = true;
+      _yamlError = null;
+      _loadingBranch = requestBranch;
+    });
 
     final api = ref.read(codemagicApiProvider);
     final prefs = ref.read(sharedPreferencesProvider);
@@ -109,9 +132,10 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
       }
 
       if (resolution.workflowIds != null) {
-        final wfs = resolution.workflowIds!
-            .map((id) => YamlWorkflow(id: id, name: id))
-            .toList();
+        final wfs =
+            resolution.workflowIds!
+                .map((id) => YamlWorkflow(id: id, name: id))
+                .toList();
         setState(() {
           _loading = false;
           _workflows = wfs;
@@ -120,14 +144,16 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
         return;
       }
 
-      _yamlError = 'Could not fetch codemagic.yaml — private or non-GitHub repo. Showing workflows from build history.';
+      _yamlError =
+          'Could not fetch codemagic.yaml — private or non-GitHub repo. Showing workflows from build history.';
     }
 
     // 2. Non-file-based apps: use API workflows
     if (!widget.app.isFileBased) {
-      final wfs = widget.workflows
-          .map((wf) => YamlWorkflow(id: wf.id, name: wf.name))
-          .toList();
+      final wfs =
+          widget.workflows
+              .map((wf) => YamlWorkflow(id: wf.id, name: wf.name))
+              .toList();
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -150,13 +176,17 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
         final seen = <String>{};
         for (final b in builds) {
           // For file-based apps, fileWorkflowId is the YAML key (e.g. "ios-workflow")
-          final id = (widget.app.isFileBased ? b.fileWorkflowId : null)
-              ?? (b.workflowId.length < 30 ? b.workflowId : null); // skip UUIDs
+          final id =
+              (widget.app.isFileBased ? b.fileWorkflowId : null) ??
+              (b.workflowId.length < 30 ? b.workflowId : null); // skip UUIDs
           if (id != null && id.isNotEmpty && seen.add(id)) {
-            all.putIfAbsent(id, () => YamlWorkflow(
-              id: id,
-              name: b.workflowName != b.workflowId ? b.workflowName : id,
-            ));
+            all.putIfAbsent(
+              id,
+              () => YamlWorkflow(
+                id: id,
+                name: b.workflowName != b.workflowId ? b.workflowName : id,
+              ),
+            );
           }
         }
       } catch (_) {}
@@ -189,7 +219,9 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
     await WorkflowCache.remove(prefs, widget.app.id, wf.id);
     setState(() {
       _workflows = _workflows.where((w) => w.id != wf.id).toList();
-      if (_selected?.id == wf.id) _selected = _workflows.isNotEmpty ? _workflows.first : null;
+      if (_selected?.id == wf.id) {
+        _selected = _workflows.isNotEmpty ? _workflows.first : null;
+      }
     });
   }
 
@@ -204,15 +236,20 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
     try {
       final api = ref.read(codemagicApiProvider);
       if (api == null) return;
+      final tag = _tagController.text.trim();
+      final useTag = _useTag && tag.isNotEmpty;
       await api.triggerBuild(
         appId: widget.app.id,
         workflowId: _selected!.id,
-        branch: _branch,
+        branch: useTag ? null : _branch,
+        tag: useTag ? tag : null,
+        instanceType: _instanceType,
       );
       if (mounted) {
+        final target = useTag ? 'tag $tag' : _branch;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Build triggered: ${_selected!.id} @ $_branch'),
+            content: Text('Build triggered: ${_selected!.id} @ $target'),
             backgroundColor: AppTheme.success,
           ),
         );
@@ -221,7 +258,10 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e'), backgroundColor: AppTheme.error),
+          SnackBar(
+            content: Text('Failed: $e'),
+            backgroundColor: AppTheme.error,
+          ),
         );
       }
     } finally {
@@ -232,41 +272,143 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Trigger Build — ${widget.app.appName}'),
-      ),
+      appBar: AppBar(title: Text('Trigger Build — ${widget.app.appName}')),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Branch selector
+          // Branch / tag selector
           Container(
             color: AppTheme.bgCard,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: Column(
               children: [
-                const Icon(Icons.call_split, size: 15, color: AppTheme.textMuted),
-                const SizedBox(width: 8),
-                const Text('Branch:', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: widget.app.branches.contains(_branch) ? _branch : null,
-                      hint: Text(_branch, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13)),
-                      isDense: true,
-                      style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-                      dropdownColor: AppTheme.bgElevated,
-                      items: widget.app.branches
-                          .map((b) => DropdownMenuItem(value: b, child: Text(b)))
-                          .toList(),
-                      onChanged: (b) {
-                        if (b != null) {
-                          setState(() => _branch = b);
-                          _loadWorkflows();
-                        }
-                      },
+                Row(
+                  children: [
+                    SegmentedButton<bool>(
+                      showSelectedIcon: false,
+                      style: ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        textStyle: WidgetStatePropertyAll(
+                          const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      segments: const [
+                        ButtonSegment(
+                          value: false,
+                          label: Text('Branch'),
+                          icon: Icon(Icons.call_split, size: 14),
+                        ),
+                        ButtonSegment(
+                          value: true,
+                          label: Text('Tag'),
+                          icon: Icon(Icons.sell_outlined, size: 14),
+                        ),
+                      ],
+                      selected: {_useTag},
+                      onSelectionChanged:
+                          (v) => setState(() => _useTag = v.first),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child:
+                          _useTag
+                              ? TextField(
+                                controller: _tagController,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  hintText: 'v1.0.0',
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                ),
+                              )
+                              : DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value:
+                                      widget.app.branches.contains(_branch)
+                                          ? _branch
+                                          : null,
+                                  hint: Text(
+                                    _branch,
+                                    style: const TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  isDense: true,
+                                  isExpanded: true,
+                                  style: const TextStyle(
+                                    color: AppTheme.textPrimary,
+                                    fontSize: 13,
+                                  ),
+                                  dropdownColor: AppTheme.bgElevated,
+                                  items:
+                                      widget.app.branches
+                                          .map(
+                                            (b) => DropdownMenuItem(
+                                              value: b,
+                                              child: Text(b),
+                                            ),
+                                          )
+                                          .toList(),
+                                  onChanged: (b) {
+                                    if (b != null) {
+                                      setState(() => _branch = b);
+                                      _loadWorkflows();
+                                    }
+                                  },
+                                ),
+                              ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.memory_rounded,
+                      size: 15,
+                      color: AppTheme.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Machine:',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          value: _instanceType,
+                          isDense: true,
+                          isExpanded: true,
+                          dropdownColor: AppTheme.bgElevated,
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 13,
+                          ),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('Workflow default'),
+                            ),
+                            ..._instanceTypes.map(
+                              (t) => DropdownMenuItem<String?>(
+                                value: t,
+                                child: Text(t),
+                              ),
+                            ),
+                          ],
+                          onChanged: (t) => setState(() => _instanceType = t),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -275,26 +417,57 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
           if (widget.app.isFileBased)
             Container(
               width: double.infinity,
-              color: _yamlError != null ? AppTheme.error.withValues(alpha: 0.12) : AppTheme.bgElevated,
+              color:
+                  _yamlError != null
+                      ? AppTheme.error.withValues(alpha: 0.12)
+                      : AppTheme.bgElevated,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
                   Icon(
-                    _yamlError != null ? Icons.warning_amber_rounded : Icons.description_outlined,
+                    _yamlError != null
+                        ? Icons.warning_amber_rounded
+                        : Icons.description_outlined,
                     size: 13,
-                    color: _yamlError != null ? AppTheme.error : AppTheme.accent,
+                    color:
+                        _yamlError != null ? AppTheme.error : AppTheme.accent,
                   ),
                   const SizedBox(width: 6),
                   if (_yamlError == null) ...[
-                    const Text('codemagic.yaml', style: TextStyle(color: AppTheme.accent, fontSize: 12, fontWeight: FontWeight.w600)),
-                    const Text(' — workflows loaded from YAML', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                    const Text(
+                      'codemagic.yaml',
+                      style: TextStyle(
+                        color: AppTheme.accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Text(
+                      ' — workflows loaded from YAML',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                    ),
                   ] else
-                    Expanded(child: Text(_yamlError!, style: const TextStyle(color: AppTheme.error, fontSize: 12))),
+                    Expanded(
+                      child: Text(
+                        _yamlError!,
+                        style: const TextStyle(
+                          color: AppTheme.error,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                   if (_yamlError != null) ...[
                     const Spacer(),
                     GestureDetector(
                       onTap: _loadWorkflows,
-                      child: const Text('Retry', style: TextStyle(color: AppTheme.accent, fontSize: 12, fontWeight: FontWeight.w600)),
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(
+                          color: AppTheme.accent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ],
@@ -302,79 +475,128 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
             ),
 
           Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'SELECT WORKFLOW',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textSecondary, letterSpacing: 1),
-                          ),
-                          TextButton.icon(
-                            onPressed: () => setState(() => _showAddField = !_showAddField),
-                            icon: Icon(_showAddField ? Icons.close : Icons.add, size: 16, color: AppTheme.primary),
-                            label: Text(
-                              _showAddField ? 'Cancel' : 'Add Workflow',
-                              style: const TextStyle(color: AppTheme.primary, fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      if (_showAddField) ...[
-                        const SizedBox(height: 8),
+            child:
+                _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      children: [
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _addController,
-                                autofocus: true,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                                decoration: InputDecoration(
-                                  hintText: 'e.g.  android-workflow',
-                                  hintStyle: const TextStyle(color: AppTheme.textMuted, fontFamily: 'monospace'),
-                                  prefixIcon: const Icon(Icons.code, size: 18, color: AppTheme.textMuted),
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                                  isDense: true,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: const BorderSide(color: AppTheme.border),
-                                  ),
-                                ),
-                                onSubmitted: _addWorkflow,
+                            const Text(
+                              'SELECT WORKFLOW',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textSecondary,
+                                letterSpacing: 1,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () => _addWorkflow(_addController.text),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primary,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            TextButton.icon(
+                              onPressed:
+                                  () => setState(
+                                    () => _showAddField = !_showAddField,
+                                  ),
+                              icon: Icon(
+                                _showAddField ? Icons.close : Icons.add,
+                                size: 16,
+                                color: AppTheme.primary,
                               ),
-                              child: const Text('Add', style: TextStyle(color: Colors.white)),
+                              label: Text(
+                                _showAddField ? 'Cancel' : 'Add Workflow',
+                                style: const TextStyle(
+                                  color: AppTheme.primary,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                      ],
 
-                      if (_workflows.isEmpty)
-                        _EmptyWorkflows(onAdd: () => setState(() => _showAddField = true))
-                      else
-                        ..._workflows.map((wf) => _WorkflowTile(
+                        if (_showAddField) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _addController,
+                                  autofocus: true,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 14,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'e.g.  android-workflow',
+                                    hintStyle: const TextStyle(
+                                      color: AppTheme.textMuted,
+                                      fontFamily: 'monospace',
+                                    ),
+                                    prefixIcon: const Icon(
+                                      Icons.code,
+                                      size: 18,
+                                      color: AppTheme.textMuted,
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 14,
+                                    ),
+                                    isDense: true,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                        color: AppTheme.border,
+                                      ),
+                                    ),
+                                  ),
+                                  onSubmitted: _addWorkflow,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed:
+                                    () => _addWorkflow(_addController.text),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 13,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Add',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        if (_workflows.isEmpty)
+                          _EmptyWorkflows(
+                            onAdd: () => setState(() => _showAddField = true),
+                          )
+                        else
+                          ..._workflows.map(
+                            (wf) => _WorkflowTile(
                               workflow: wf,
                               isSelected: _selected?.id == wf.id,
                               onTap: () => setState(() => _selected = wf),
-                              onDelete: wf.fromCache ? () => _removeWorkflow(wf) : null,
-                            )),
-                    ],
-                  ),
+                              onDelete:
+                                  wf.fromCache
+                                      ? () => _removeWorkflow(wf)
+                                      : null,
+                            ),
+                          ),
+                      ],
+                    ),
           ),
 
           // Trigger button
@@ -384,22 +606,40 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
-                onPressed: (_selected == null || _isTriggering) ? null : _trigger,
+                onPressed:
+                    (_selected == null || _isTriggering) ? null : _trigger,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   disabledBackgroundColor: AppTheme.bgCard,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                icon: _isTriggering
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.local_fire_department_rounded, color: Colors.white),
+                icon:
+                    _isTriggering
+                        ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                        : const Icon(
+                          Icons.local_fire_department_rounded,
+                          color: Colors.white,
+                        ),
                 label: Text(
                   _isTriggering
                       ? 'Triggering…'
                       : _selected == null
-                          ? 'Select a workflow first'
-                          : 'Run  ${_selected!.id}  @  $_branch',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                      ? 'Select a workflow first'
+                      : 'Run  ${_selected!.id}  @  $_branch',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
                 ),
               ),
             ),
@@ -431,7 +671,10 @@ class _WorkflowTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: isSelected ? AppTheme.primary.withValues(alpha: 0.12) : AppTheme.bgCard,
+        color:
+            isSelected
+                ? AppTheme.primary.withValues(alpha: 0.12)
+                : AppTheme.bgCard,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
@@ -448,7 +691,9 @@ class _WorkflowTile extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  isSelected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
                   color: isSelected ? AppTheme.primary : AppTheme.textMuted,
                   size: 20,
                 ),
@@ -463,7 +708,10 @@ class _WorkflowTile extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: isSelected ? AppTheme.textPrimary : AppTheme.textSecondary,
+                            color:
+                                isSelected
+                                    ? AppTheme.textPrimary
+                                    : AppTheme.textSecondary,
                           ),
                         ),
                       Text(
@@ -471,8 +719,16 @@ class _WorkflowTile extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: hasCustomName ? 11 : 14,
-                          fontWeight: hasCustomName ? FontWeight.normal : FontWeight.w600,
-                          color: hasCustomName ? AppTheme.textMuted : (isSelected ? AppTheme.textPrimary : AppTheme.textSecondary),
+                          fontWeight:
+                              hasCustomName
+                                  ? FontWeight.normal
+                                  : FontWeight.w600,
+                          color:
+                              hasCustomName
+                                  ? AppTheme.textMuted
+                                  : (isSelected
+                                      ? AppTheme.textPrimary
+                                      : AppTheme.textSecondary),
                         ),
                       ),
                     ],
@@ -481,7 +737,10 @@ class _WorkflowTile extends StatelessWidget {
                 if (workflow.instanceType != null)
                   Container(
                     margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.bgElevated,
                       borderRadius: BorderRadius.circular(6),
@@ -489,7 +748,10 @@ class _WorkflowTile extends StatelessWidget {
                     ),
                     child: Text(
                       workflow.instanceType!,
-                      style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.textMuted,
+                      ),
                     ),
                   ),
                 if (onDelete != null)
@@ -497,7 +759,11 @@ class _WorkflowTile extends StatelessWidget {
                     onTap: onDelete,
                     child: const Padding(
                       padding: EdgeInsets.only(left: 4),
-                      child: Icon(Icons.close, size: 16, color: AppTheme.textMuted),
+                      child: Icon(
+                        Icons.close,
+                        size: 16,
+                        color: AppTheme.textMuted,
+                      ),
                     ),
                   ),
               ],
@@ -519,7 +785,11 @@ class _EmptyWorkflows extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: Column(
         children: [
-          const Icon(Icons.description_outlined, size: 48, color: AppTheme.textMuted),
+          const Icon(
+            Icons.description_outlined,
+            size: 48,
+            color: AppTheme.textMuted,
+          ),
           const SizedBox(height: 16),
           const Text(
             'No workflows yet',
@@ -529,16 +799,26 @@ class _EmptyWorkflows extends StatelessWidget {
           const Text(
             'Add the workflow ID from your codemagic.yaml\n(e.g.  android-workflow)',
             textAlign: TextAlign.center,
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.5, fontFamily: 'monospace'),
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 13,
+              height: 1.5,
+              fontFamily: 'monospace',
+            ),
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: onAdd,
             icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text('Add Workflow ID', style: TextStyle(color: Colors.white)),
+            label: const Text(
+              'Add Workflow ID',
+              style: TextStyle(color: Colors.white),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
         ],

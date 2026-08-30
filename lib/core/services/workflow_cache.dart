@@ -12,15 +12,26 @@ class WorkflowCache {
     return Future.value(raw);
   }
 
-  static Future<void> add(SharedPreferences prefs, String appId, String workflowId) async {
+  static Future<void> add(
+    SharedPreferences prefs,
+    String appId,
+    String workflowId,
+  ) async {
     final current = prefs.getStringList(_key(appId)) ?? [];
     if (!current.contains(workflowId)) {
       await prefs.setStringList(_key(appId), [workflowId, ...current]);
     }
   }
 
-  static Future<void> remove(SharedPreferences prefs, String appId, String workflowId) async {
+  static Future<void> remove(
+    SharedPreferences prefs,
+    String appId,
+    String workflowId,
+  ) async {
     final current = prefs.getStringList(_key(appId)) ?? [];
-    await prefs.setStringList(_key(appId), current.where((e) => e != workflowId).toList());
+    await prefs.setStringList(
+      _key(appId),
+      current.where((e) => e != workflowId).toList(),
+    );
   }
 }

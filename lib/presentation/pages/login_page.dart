@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../core/providers/auth_provider.dart';
 import '../../core/providers/accounts_provider.dart';
 import '../../core/providers/biometric_provider.dart';
 import '../../core/services/codemagic_api.dart';
 import '../../core/theme/app_theme.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({super.key});
+  /// When true the page is adding a second account rather than signing in for
+  /// the first time: it offers a name field, a way back, and returns to where
+  /// it was opened from instead of resetting navigation.
+  final bool isAddingAccount;
+
+  const LoginPage({super.key, this.isAddingAccount = false});
 
   @override
   ConsumerState<LoginPage> createState() => _LoginPageState();
@@ -35,24 +39,35 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       setState(() => _error = 'API token is required');
       return;
     }
-    setState(() { _isLoading = true; _error = null; });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final api = CodemagicApi(token);
       // Validate token + try to get a name from the API
       String accountName = _nameController.text.trim();
       final futures = await Future.wait([
         api.getApplications(),
-        if (accountName.isEmpty) api.getUser().catchError((_) => <String, dynamic>{}),
+        if (accountName.isEmpty)
+          api.getUser().catchError((_) => <String, dynamic>{}),
       ]);
       if (accountName.isEmpty) {
-        final user = futures.length > 1 ? futures[1] as Map<String, dynamic> : {};
-        accountName = user['user']?['email']?.toString()
-            ?? user['email']?.toString()
-            ?? 'Account';
+        final user =
+            futures.length > 1 ? futures[1] as Map<String, dynamic> : {};
+        accountName =
+            user['user']?['email']?.toString() ??
+            user['email']?.toString() ??
+            'Account';
       }
       await ref.read(accountsProvider.notifier).addAccount(token, accountName);
       ref.read(biometricUnlockedProvider.notifier).state = true;
-      if (mounted) context.go('/');
+      if (!mounted) return;
+      if (widget.isAddingAccount) {
+        context.pop();
+      } else {
+        context.go('/');
+      }
     } catch (e) {
       setState(() => _error = 'Invalid token or connection failed');
     } finally {
@@ -63,6 +78,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar:
+          widget.isAddingAccount
+              ? AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                title: const Text('Add account'),
+              )
+              : null,
       body: Stack(
         children: [
           // Glow background
@@ -103,7 +126,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           // Content
           Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 48),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 28.0,
+                vertical: 48,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -111,29 +137,37 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   // Logo
                   Center(
                     child: Container(
-                      width: 88,
-                      height: 88,
-                      decoration: BoxDecoration(
-                        gradient: const RadialGradient(
-                          colors: [AppTheme.primaryLight, AppTheme.primaryDark],
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primary.withValues(alpha: 0.4),
-                            blurRadius: 24,
-                            spreadRadius: 4,
+                          width: 88,
+                          height: 88,
+                          decoration: BoxDecoration(
+                            gradient: const RadialGradient(
+                              colors: [
+                                AppTheme.primaryLight,
+                                AppTheme.primaryDark,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primary.withValues(alpha: 0.4),
+                                blurRadius: 24,
+                                spreadRadius: 4,
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.local_fire_department_rounded,
-                        size: 48,
-                        color: Colors.white,
-                      ),
-                    )
+                          child: const Icon(
+                            Icons.local_fire_department_rounded,
+                            size: 48,
+                            color: Colors.white,
+                          ),
+                        )
                         .animate(onPlay: (c) => c.repeat(reverse: true))
-                        .scaleXY(begin: 0.96, end: 1.04, duration: 2400.ms, curve: Curves.easeInOut),
+                        .scaleXY(
+                          begin: 0.96,
+                          end: 1.04,
+                          duration: 2400.ms,
+                          curve: Curves.easeInOut,
+                        ),
                   ),
                   const SizedBox(height: 28),
                   // Brand name
@@ -165,10 +199,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     decoration: InputDecoration(
                       labelText: 'Personal Access Token',
                       hintText: 'Paste your Codemagic token',
-                      prefixIcon: const Icon(Icons.vpn_key_rounded, color: AppTheme.textMuted),
+                      prefixIcon: const Icon(
+                        Icons.vpn_key_rounded,
+                        color: AppTheme.textMuted,
+                      ),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          _obscure
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
                           color: AppTheme.textMuted,
                           size: 20,
                         ),
@@ -179,6 +218,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                     onSubmitted: (_) => _login(),
                   ).animate().fadeIn(delay: 300.ms),
+                  if (widget.isAddingAccount) ...[
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Account name (optional)',
+                        hintText: 'Defaults to the account email',
+                        prefixIcon: Icon(
+                          Icons.badge_outlined,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                      onSubmitted: (_) => _login(),
+                    ).animate().fadeIn(delay: 350.ms),
+                  ],
                   const SizedBox(height: 12),
                   Text(
                     'Find your token in Codemagic → Team settings → Integrations → Codemagic API',
@@ -196,34 +250,45 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       onPressed: _isLoading ? null : _login,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                         elevation: 0,
                         shadowColor: Colors.transparent,
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Connect',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                      child:
+                          _isLoading
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
                                   ),
                                 ),
-                              ],
-                            ),
+                              )
+                              : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.bolt_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    widget.isAddingAccount
+                                        ? 'Add account'
+                                        : 'Connect',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
                     ),
                   ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.2, end: 0),
                 ],

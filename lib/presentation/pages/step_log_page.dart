@@ -1,0 +1,170 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/models/app_model.dart';
+import '../../core/providers/codemagic_provider.dart';
+import '../../core/theme/app_theme.dart';
+
+/// Shows one build step's raw log.
+///
+/// The API serves this as `text/plain` from `/builds/:id/step/:stepId`, so
+/// there is nothing to parse — it is rendered as-is, selectable, in a
+/// horizontally scrollable monospace block so long lines are not wrapped into
+/// nonsense.
+class StepLogPage extends ConsumerWidget {
+  final String buildId;
+  final CmBuildAction step;
+
+  const StepLogPage({super.key, required this.buildId, required this.step});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final logAsync = ref.watch(stepLogProvider(StepLogRef(buildId, step.id)));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              step.name,
+              style: const TextStyle(fontSize: 16),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              step.status,
+              style: TextStyle(
+                fontSize: 11,
+                color: _statusColor(step),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Copy log',
+            icon: const Icon(Icons.copy_rounded, size: 20),
+            onPressed:
+                logAsync.valueOrNull == null
+                    ? null
+                    : () {
+                      Clipboard.setData(ClipboardData(text: logAsync.value!));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Log copied'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    },
+          ),
+          IconButton(
+            tooltip: 'Reload',
+            icon: const Icon(Icons.refresh_rounded, size: 20),
+            onPressed:
+                () => ref.invalidate(
+                  stepLogProvider(StepLogRef(buildId, step.id)),
+                ),
+          ),
+        ],
+      ),
+      body: logAsync.when(
+        data: (log) {
+          if (log.trim().isEmpty) {
+            return const Center(
+              child: Text(
+                'This step produced no output.',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+            );
+          }
+          return Scrollbar(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SelectableText(
+                  log,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    height: 1.45,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error:
+            (e, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      kIsWeb ? Icons.public_off_rounded : Icons.error_outline,
+                      color: kIsWeb ? AppTheme.textMuted : AppTheme.error,
+                      size: 40,
+                    ),
+                    const SizedBox(height: 12),
+                    // The step-log endpoint sends no CORS headers, unlike the
+                    // rest of the API, so a browser can never read it. Saying
+                    // that is more use than showing the raw exception.
+                    Text(
+                      kIsWeb
+                          ? 'Step logs are not available on the web.'
+                          : 'Could not load this log.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: kIsWeb ? AppTheme.textPrimary : AppTheme.error,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      kIsWeb
+                          ? "Codemagic's log endpoint does not allow browser "
+                              'requests. Open this build in the Codemagic '
+                              'console, or use the Android, iOS or desktop '
+                              'build of Ignite.'
+                          : '$e',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
+                    ),
+                    if (!kIsWeb) ...[
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed:
+                            () => ref.invalidate(
+                              stepLogProvider(StepLogRef(buildId, step.id)),
+                            ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+      ),
+    );
+  }
+
+  static Color _statusColor(CmBuildAction a) {
+    if (a.isSuccess) return AppTheme.success;
+    if (a.isFailed) return AppTheme.error;
+    if (a.isSkipped) return AppTheme.textMuted;
+    if (a.isCanceled) return AppTheme.textMuted;
+    return AppTheme.warning;
+  }
+}

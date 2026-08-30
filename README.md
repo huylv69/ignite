@@ -1,78 +1,83 @@
 # Ignite — Codemagic CI/CD Admin 🚀
 
-**Ignite** là một ứng dụng quản trị (Admin Dashboard) mạnh mẽ và hiện đại được thiết kế dành riêng cho việc quản lý các quy trình CI/CD trên nền tảng **Codemagic**. Với giao diện tối giản, hiệu ứng Glassmorphism sang trọng và khả năng tương tác thời gian thực, Ignite giúp các nhà phát triển theo dõi và điều hành hệ thống build một cách mượt mà nhất.
+**Ignite** là ứng dụng quản trị các pipeline CI/CD trên **Codemagic**: xem app, theo dõi build, đọc log từng bước, kích hoạt build, dọn cache và quản lý biến môi trường — không phải mở web console.
 
 ---
 
-## ✨ Các tính năng nổi bật (Key Features)
+## ✨ Tính năng
 
-### 🔐 Quản lý Đăng nhập Bảo mật
-- Hỗ trợ đăng nhập nhanh chóng và bảo mật thông qua **Codemagic API Token**.
-- Lưu trữ token an toàn và quản lý phiên làm việc thông minh.
+### 🔐 Đăng nhập & nhiều tài khoản
+- Đăng nhập bằng **Codemagic API Token**, lưu cục bộ trong SharedPreferences.
+- **Nhiều tài khoản**: thêm, đổi qua lại, đổi tên, gỡ — ngay trên thanh tiêu đề.
+- Khoá app bằng **sinh trắc học** khi mở lại (bỏ qua trên web).
 
-### 📱 Danh sách Ứng dụng Trực quan
-- Hiển thị toàn bộ danh sách các project được cấu hình trên Codemagic.
-- Phân loại và tìm kiếm ứng dụng dễ dàng.
-- Theo dõi trạng thái build mới nhất ngay tại màn hình chính.
+### 📱 Danh sách ứng dụng
+- Liệt kê toàn bộ app trong tài khoản.
+- **Tìm kiếm** theo tên app hoặc URL repository.
+- Mỗi thẻ hiện **trạng thái build gần nhất** kèm thời gian, lấy bằng một request duy nhất cho cả danh sách.
 
-### 📊 Dashboard Chi tiết & Số liệu
-- Xem lịch sử build chi tiết cho từng ứng dụng.
-- Biểu đồ thống kê hiệu suất build, thời gian build trung bình (sử dụng `fl_chart`).
-- Trạng thái build được cập nhật theo thời gian thực (Success, Failed, Building...).
+### 📊 Build & thống kê
+- Lịch sử build theo từng app, tự động poll mỗi 12 giây khi có build đang chạy.
+- Biểu đồ phân bố kết quả và tỉ lệ thành công (`fl_chart`).
+- **Huỷ build** đang chạy.
 
-### ⚡ Kích hoạt Build Linh hoạt (YAML Triggering)
-- Hỗ trợ kích hoạt build thủ công với các cấu hình workflow tùy chỉnh.
-- Giao diện trực quan để chọn branch và workflow từ file `codemagic.yaml`.
+### 📜 Log từng bước
+- Xem danh sách các bước của một build kèm trạng thái và thời lượng.
+- Mở **log thô** của từng bước, chọn được chữ, copy toàn bộ.
 
-### 🎨 Trải nghiệm Người dùng Đẳng cấp
-- **Giao diện Modern UI**: Thiết kế theo phong cách Glassmorphism với các thành phần trong suốt và đổ bóng mềm mại.
-- **Hiệu ứng mượt mà**: Tích hợp `flutter_animate` cho các hiệu ứng chuyển cảnh và loading vô cùng chuyên nghiệp.
-- **Chế độ tối ưu**: Hỗ trợ font chữ hiện đại (Google Fonts) và loading shimmer cho trải nghiệm không bị gián đoạn.
+### 📦 Artifact
+- Tải artifact về máy kèm thanh tiến độ, rồi chia sẻ qua share sheet.
+- Tạo **link công khai có hạn 24 giờ** để gửi cho người không có quyền truy cập Codemagic.
+
+### ⚡ Kích hoạt build
+- Chọn workflow từ `codemagic.yaml` hoặc từ workflow editor.
+- Chạy theo **branch hoặc tag**.
+- Chọn **loại máy** (`mac_mini_m1`, `mac_mini_m2`, `linux_x2`, `windows_x2`) hoặc để workflow tự quyết.
+- Truyền biến môi trường ngay lúc kích hoạt.
+
+### 🧹 Cache & biến môi trường
+- Xem cache theo workflow kèm dung lượng và lần dùng cuối; xoá từng cái hoặc xoá sạch.
+- CRUD biến môi trường theo nhóm; giá trị `secure` luôn ở dạng che.
+
+### 🎨 Giao diện
+- Dark theme Material 3, tông cam.
+- **Shimmer skeleton** khi tải, chuyển cảnh bằng `flutter_animate`.
 
 ---
 
-## 🛠 Công nghệ sử dụng (Tech Stack)
+## 🛠 Tech stack
 
-Dự án được xây dựng trên nền tảng **Flutter** với các thư viện hàng đầu:
-
-- **State Management**: [Riverpod](https://riverpod.dev/) — Đảm bảo quản lý trạng thái ứng dụng một cách nhất quán và dễ mở rộng.
-- **Navigation**: [GoRouter](https://pub.dev/packages/go_router) — Điều hướng mạnh mẽ và hỗ trợ deep linking.
-- **Networking**: [http](https://pub.dev/packages/http) — Tương tác trực tiếp với Codemagic REST API.
-- **Data Visualization**: [fl_chart](https://pub.dev/packages/fl_chart) — Tạo các biểu đồ thống kê sinh động.
-- **Animations**: [flutter_animate](https://pub.dev/packages/flutter_animate) — Mang lại sự sống động cho giao diện.
-- **Persistence**: [shared_preferences](https://pub.dev/packages/shared_preferences) — Lưu trữ cài đặt và token người dùng cục bộ.
+- **State**: [Riverpod](https://riverpod.dev/)
+- **Navigation**: [GoRouter](https://pub.dev/packages/go_router)
+- **Networking**: [http](https://pub.dev/packages/http) — gọi thẳng Codemagic REST API
+- **Charts**: [fl_chart](https://pub.dev/packages/fl_chart)
+- **Animation**: [flutter_animate](https://pub.dev/packages/flutter_animate), [shimmer](https://pub.dev/packages/shimmer)
+- **Lưu trữ**: [shared_preferences](https://pub.dev/packages/shared_preferences)
+- **Bảo mật**: [local_auth](https://pub.dev/packages/local_auth)
 
 ---
 
 ## 🚀 Bắt đầu
 
-### Điều kiện tiên quyết
-- Flutter SDK (^3.7.0)
-- Một tài khoản Codemagic và API Token hợp lệ.
+Cần Flutter SDK `^3.7.0` và một Codemagic API token
+(*User settings → Integrations → Codemagic API*).
 
-### Cài đặt
-1. Clone repository:
-   ```bash
-   git clone <your-repo-url>
-   ```
-2. Cài đặt dependencies:
-   ```bash
-   flutter pub get
-   ```
-3. Chạy ứng dụng:
-   ```bash
-   flutter run
-   ```
+```bash
+flutter pub get
+flutter run
+```
 
----
+Nền tảng đã build được: Android, iOS, Linux, Web.
 
-## 📸 Ảnh chụp màn hình (Screenshots)
-*(Vui lòng thêm ảnh chụp màn hình thực tế của bạn tại đây)*
+### Kiểm tra
+
+```bash
+flutter analyze   # phải ra "No issues found!"
+flutter test
+```
 
 ---
 
 ## 📄 Giấy phép
-Dự án được phát hành dưới giấy phép [MIT](LICENSE).
 
----
-*Phát triển bởi đội ngũ đam mê CI/CD.*
+[MIT](LICENSE)

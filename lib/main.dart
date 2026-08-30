@@ -20,9 +20,7 @@ void main() async {
 
   runApp(
     ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-      ],
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
       child: const CodemagicAdminApp(),
     ),
   );
@@ -35,9 +33,13 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     // Web has no biometrics — treat as always unlocked
-    initialLocation: !hasToken ? '/login' : (unlocked || kIsWeb ? '/' : '/unlock'),
+    initialLocation:
+        !hasToken ? '/login' : (unlocked || kIsWeb ? '/' : '/unlock'),
     redirect: (context, state) {
       final loc = state.matchedLocation;
+      // Adding a second account has to reach the login form even though a
+      // token already exists, so that case is let through.
+      final isAddingAccount = state.uri.queryParameters['add'] == 'true';
 
       if (!hasToken) {
         return loc == '/login' ? null : '/login';
@@ -45,13 +47,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (!unlocked && !kIsWeb) {
         return loc == '/unlock' ? null : '/unlock';
       }
+      if (loc == '/login' && isAddingAccount) return null;
       if (loc == '/login' || loc == '/unlock') return '/';
       return null;
     },
     routes: [
-      GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
-      GoRoute(path: '/unlock', builder: (_, __) => const LockPage()),
-      GoRoute(path: '/', builder: (_, __) => const AppsPage()),
+      GoRoute(
+        path: '/login',
+        builder:
+            (_, state) => LoginPage(
+              isAddingAccount: state.uri.queryParameters['add'] == 'true',
+            ),
+      ),
+      GoRoute(path: '/unlock', builder: (_, _) => const LockPage()),
+      GoRoute(path: '/', builder: (_, _) => const AppsPage()),
       GoRoute(
         path: '/app/:id',
         builder: (context, state) {

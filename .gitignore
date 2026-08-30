@@ -58,3 +58,6 @@ android/app/google-services.json
 **/secrets.yaml
 **/secrets.yml
 .ast-graph/
+
+# Eclipse workspace that happens to live inside this checkout
+/workspace/

@@ -3,105 +3,195 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import '../../core/models/app_model.dart';
 import '../../core/providers/codemagic_provider.dart';
 import '../../core/providers/accounts_provider.dart';
 import '../../core/providers/app_info_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../widgets/account_sheet.dart';
+import '../widgets/skeletons.dart';
 
-class AppsPage extends ConsumerWidget {
+class AppsPage extends ConsumerStatefulWidget {
   const AppsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppsPage> createState() => _AppsPageState();
+}
+
+class _AppsPageState extends ConsumerState<AppsPage> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final appsAsync = ref.watch(appsProvider);
+    final filtered = ref.watch(filteredAppsProvider);
+    final query = ref.watch(appSearchQueryProvider);
+    final activeAccount = ref.watch(accountsProvider).active;
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 120,
-            floating: false,
-            pinned: true,
-            backgroundColor: AppTheme.bg,
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              title: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppTheme.primaryLight, AppTheme.primaryDark],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primary.withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          spreadRadius: 1,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(appsProvider);
+          ref.invalidate(latestBuildsProvider);
+        },
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              // 120 for the branded header plus the 56 the search field below
+              // it occupies, otherwise the title collides with the search bar.
+              expandedHeight: 176,
+              floating: false,
+              pinned: true,
+              backgroundColor: AppTheme.bg,
+              flexibleSpace: FlexibleSpaceBar(
+                // The bottom 72 clears the 56pt search field plus its 16pt gap; a
+                // FlexibleSpaceBar measures its title from the very bottom of
+                // the app bar, `bottom` widget included.
+                titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 72),
+                title: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppTheme.primaryLight, AppTheme.primaryDark],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primary.withValues(alpha: 0.4),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.local_fire_department_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Ignite',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ],
+                ),
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppTheme.primary.withValues(alpha: 0.06),
+                        AppTheme.bg,
                       ],
                     ),
-                    child: const Icon(Icons.local_fire_department_rounded, size: 16, color: Colors.white),
                   ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Ignite',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                ],
+                ),
               ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppTheme.primary.withValues(alpha: 0.06),
-                      AppTheme.bg,
-                    ],
+              actions: [
+                _AccountButton(
+                  name: activeAccount?.name,
+                  onTap: () => AccountSheet.show(context),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.info_outline_rounded, size: 20),
+                  tooltip: 'About',
+                  onPressed: () => _showInfoSheet(context, ref),
+                ),
+                const SizedBox(width: 4),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(56),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged:
+                        (v) =>
+                            ref.read(appSearchQueryProvider.notifier).state = v,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: 'Search apps or repositories',
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        size: 18,
+                        color: AppTheme.textMuted,
+                      ),
+                      suffixIcon:
+                          query.isEmpty
+                              ? null
+                              : IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 18),
+                                color: AppTheme.textMuted,
+                                onPressed: () {
+                                  _searchController.clear();
+                                  ref
+                                      .read(appSearchQueryProvider.notifier)
+                                      .state = '';
+                                },
+                              ),
+                    ),
                   ),
                 ),
               ),
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.info_outline_rounded, size: 20),
-                tooltip: 'About',
-                onPressed: () => _showInfoSheet(context, ref),
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout_rounded, size: 20),
-                tooltip: 'Sign out',
-                onPressed: () async {
-                  await ref.read(accountsProvider.notifier).logoutActive();
-                  if (context.mounted) context.go('/login');
-                },
-              ),
-              const SizedBox(width: 4),
-            ],
-          ),
-          appsAsync.when(
-            data: (apps) {
-              if (apps.isEmpty) {
-                return const SliverFillRemaining(
-                  child: Center(child: Text('No applications found.')),
-                );
-              }
-              return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
+            appsAsync.when(
+              data: (allApps) {
+                if (allApps.isEmpty) {
+                  return const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: Text('No applications found.')),
+                  );
+                }
+                final apps = filtered.valueOrNull ?? allApps;
+                if (apps.isEmpty) {
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.search_off_rounded,
+                            size: 40,
+                            color: AppTheme.textMuted,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No apps match "$query"',
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
                       final app = apps[index];
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -110,45 +200,97 @@ class AppsPage extends ConsumerWidget {
                             .fadeIn(delay: (50 * index).ms)
                             .slideX(begin: 0.06, end: 0),
                       );
-                    },
-                    childCount: apps.length,
+                    }, childCount: apps.length),
                   ),
-                ),
-              );
-            },
-            loading: () => const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (e, _) => SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline, color: AppTheme.error, size: 48),
-                    const SizedBox(height: 16),
-                    Text('Failed to load: $e', style: const TextStyle(color: AppTheme.error)),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => ref.invalidate(appsProvider),
-                      child: const Text('Retry'),
+                );
+              },
+              loading:
+                  () => const SliverPadding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    sliver: SliverToBoxAdapter(child: AppListSkeleton()),
+                  ),
+              error:
+                  (e, _) => SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: AppTheme.error,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Failed to load: $e',
+                            style: const TextStyle(color: AppTheme.error),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => ref.invalidate(appsProvider),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
-              ),
+                  ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _AppCard extends StatelessWidget {
-  final dynamic app;
-  const _AppCard({required this.app});
+/// The active account, and the way into switching it.
+class _AccountButton extends StatelessWidget {
+  final String? name;
+  final VoidCallback onTap;
+  const _AccountButton({required this.name, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    return Tooltip(
+      message: name == null ? 'Accounts' : 'Account: $name',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.18),
+            shape: BoxShape.circle,
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.45)),
+          ),
+          child: Text(
+            (name == null || name!.trim().isEmpty)
+                ? '?'
+                : name!.trim()[0].toUpperCase(),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AppCard extends ConsumerWidget {
+  final CmApplication app;
+  const _AppCard({required this.app});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Builds age out of the list endpoint, so a missing entry means "nothing
+    // recent", not "failed to load". Render nothing rather than an error.
+    final latest = ref.watch(latestBuildsProvider).valueOrNull?[app.id];
+
     return Card(
       child: InkWell(
         onTap: () => context.push('/app/${app.id}', extra: app),
@@ -170,9 +312,15 @@ class _AppCard extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: AppTheme.primary.withValues(alpha: 0.3),
+                  ),
                 ),
-                child: const Icon(Icons.rocket_launch_rounded, color: AppTheme.primary, size: 22),
+                child: const Icon(
+                  Icons.rocket_launch_rounded,
+                  color: AppTheme.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -181,25 +329,99 @@ class _AppCard extends StatelessWidget {
                   children: [
                     Text(
                       app.appName,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       app.repositoryUrl ?? 'No repository',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textMuted,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (latest != null) ...[
+                      const SizedBox(height: 8),
+                      BuildStatusChip(cmBuild: latest),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: AppTheme.textMuted, size: 20),
+              const Icon(
+                Icons.chevron_right,
+                color: AppTheme.textMuted,
+                size: 20,
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+}
+
+/// A coloured pill showing a build's outcome and how long ago it ran.
+class BuildStatusChip extends StatelessWidget {
+  final CmBuild cmBuild;
+  const BuildStatusChip({super.key, required this.cmBuild});
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, label, icon) = _style(cmBuild);
+    final when = cmBuild.startedAt ?? cmBuild.finishedAt;
+
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 11, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (when != null) ...[
+          const SizedBox(width: 8),
+          Text(
+            timeago.format(when),
+            style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+          ),
+        ],
+      ],
+    );
+  }
+
+  static (Color, String, IconData) _style(CmBuild b) {
+    if (b.isSuccess) return (AppTheme.success, 'PASSED', Icons.check_rounded);
+    if (b.isFailed) return (AppTheme.error, 'FAILED', Icons.close_rounded);
+    if (b.isRunning) {
+      return (AppTheme.warning, 'BUILDING', Icons.sync_rounded);
+    }
+    if (b.isCanceled) {
+      return (AppTheme.textMuted, 'CANCELED', Icons.block_rounded);
+    }
+    return (AppTheme.textSecondary, b.status.toUpperCase(), Icons.help_outline);
   }
 }
 
@@ -254,7 +476,11 @@ class _InfoSheet extends ConsumerWidget {
                 ),
               ],
             ),
-            child: const Icon(Icons.local_fire_department_rounded, size: 34, color: Colors.white),
+            child: const Icon(
+              Icons.local_fire_department_rounded,
+              size: 34,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 14),
           const Text(
@@ -273,10 +499,14 @@ class _InfoSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 6),
           appInfoAsync.when(
-            data: (info) => Text(
-              'v${info.version}+${info.buildNumber}',
-              style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-            ),
+            data:
+                (info) => Text(
+                  'v${info.version}+${info.buildNumber}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
             loading: () => const SizedBox.shrink(),
             error: (e, st) => const SizedBox.shrink(),
           ),
@@ -293,15 +523,25 @@ class _InfoSheet extends ConsumerWidget {
                   color: AppTheme.bgElevated,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.person_outline_rounded, size: 18, color: AppTheme.textSecondary),
+                child: const Icon(
+                  Icons.person_outline_rounded,
+                  size: 18,
+                  color: AppTheme.textSecondary,
+                ),
               ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
-                  Text('Author', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                  Text(
+                    'Author',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  ),
                   SizedBox(height: 2),
-                  Text(kAppAuthorEmail, style: TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+                  Text(
+                    kAppAuthorEmail,
+                    style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                  ),
                 ],
               ),
             ],
@@ -321,7 +561,9 @@ class _InfoSheet extends ConsumerWidget {
                 backgroundColor: const Color(0xFFFFDD00),
                 foregroundColor: const Color(0xFF1A1A1A),
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 elevation: 0,
               ),
             ),
@@ -335,61 +577,67 @@ class _InfoSheet extends ConsumerWidget {
 void _showCoffeeQRDialog(BuildContext context) {
   showDialog(
     context: context,
-    builder: (ctx) => Dialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '☕ Buy me a coffee',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A1A),
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Scan to support the author',
-              style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
-            ),
-            const SizedBox(height: 20),
-            QrImageView(
-              data: kBankQRData,
-              version: QrVersions.auto,
-              size: 220,
-              backgroundColor: Colors.white,
-              eyeStyle: const QrEyeStyle(
-                eyeShape: QrEyeShape.square,
-                color: Color(0xFF1A1A1A),
-              ),
-              dataModuleStyle: const QrDataModuleStyle(
-                dataModuleShape: QrDataModuleShape.square,
-                color: Color(0xFF1A1A1A),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF1A1A1A),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    side: const BorderSide(color: Color(0xFFDDDDDD)),
+    builder:
+        (ctx) => Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '☕ Buy me a coffee',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
                   ),
                 ),
-                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Scan to support the author',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
+                ),
+                const SizedBox(height: 20),
+                QrImageView(
+                  data: kBankQRData,
+                  version: QrVersions.auto,
+                  size: 220,
+                  backgroundColor: Colors.white,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF1A1A1A),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: const BorderSide(color: Color(0xFFDDDDDD)),
+                      ),
+                    ),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
-    ),
   );
 }

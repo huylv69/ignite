@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -9,6 +8,8 @@ import '../../core/models/app_model.dart';
 import '../../core/providers/codemagic_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../widgets/build_detail_sheet.dart';
+import 'caches_page.dart';
+import 'variables_page.dart';
 import 'yaml_trigger_page.dart';
 
 class AppDetailPage extends ConsumerStatefulWidget {
@@ -19,7 +20,8 @@ class AppDetailPage extends ConsumerStatefulWidget {
   ConsumerState<AppDetailPage> createState() => _AppDetailPageState();
 }
 
-class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTickerProviderStateMixin {
+class _AppDetailPageState extends ConsumerState<AppDetailPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isTriggering = false;
 
@@ -56,7 +58,10 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to trigger build: $e'), backgroundColor: AppTheme.error),
+          SnackBar(
+            content: Text('Failed to trigger build: $e'),
+            backgroundColor: AppTheme.error,
+          ),
         );
       }
     } finally {
@@ -71,40 +76,60 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Quick Trigger',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      builder:
+          (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Quick Trigger',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Select a workflow to start on the default branch',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (workflows.isEmpty)
+                    const Text(
+                      'No workflows available.',
+                      style: TextStyle(color: AppTheme.error),
+                    )
+                  else
+                    ...workflows.map(
+                      (wf) => ListTile(
+                        leading: const Icon(
+                          Icons.play_circle_fill,
+                          color: AppTheme.primary,
+                        ),
+                        title: Text(wf.name),
+                        subtitle: Text(
+                          wf.id,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _triggerBuild(wf.id);
+                        },
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Select a workflow to start on the default branch',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              if (workflows.isEmpty)
-                const Text('No workflows available.', style: TextStyle(color: AppTheme.error))
-              else
-                ...workflows.map((wf) => ListTile(
-                      leading: const Icon(Icons.play_circle_fill, color: AppTheme.primary),
-                      title: Text(wf.name),
-                      subtitle: Text(wf.id, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _triggerBuild(wf.id);
-                      },
-                    )),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -128,63 +153,83 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Trigger New Build',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
+      builder:
+          (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Trigger New Build',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  child: const Icon(Icons.bolt_rounded, color: AppTheme.primary),
-                ),
-                title: const Text('Quick Trigger', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text(
-                  'Pick a workflow, start immediately',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showQuickTriggerDialog(workflows);
-                },
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.bolt_rounded,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                    title: const Text(
+                      'Quick Trigger',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(
+                      'Pick a workflow, start immediately',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showQuickTriggerDialog(workflows);
+                    },
                   ),
-                  child: const Icon(Icons.code, color: AppTheme.accent),
-                ),
-                title: const Text('YAML Config Trigger', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text(
-                  'Define workflow, branch & env vars in YAML',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _openYamlTrigger(workflows);
-                },
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.code, color: AppTheme.accent),
+                    ),
+                    title: const Text(
+                      'YAML Config Trigger',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(
+                      'Define workflow, branch & env vars in YAML',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openYamlTrigger(workflows);
+                    },
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -196,6 +241,40 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
       appBar: AppBar(
         title: Text(widget.app.appName),
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            color: AppTheme.bgElevated,
+            onSelected: (value) {
+              final page =
+                  value == 'caches'
+                      ? CachesPage(app: widget.app)
+                      : VariablesPage(app: widget.app);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+            },
+            itemBuilder:
+                (_) => const [
+                  PopupMenuItem(
+                    value: 'caches',
+                    child: Row(
+                      children: [
+                        Icon(Icons.archive_outlined, size: 18),
+                        SizedBox(width: 10),
+                        Text('Caches'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'variables',
+                    child: Row(
+                      children: [
+                        Icon(Icons.data_object_rounded, size: 18),
+                        SizedBox(width: 10),
+                        Text('Environment variables'),
+                      ],
+                    ),
+                  ),
+                ],
+          ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -218,12 +297,19 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   children: [
-                    const Icon(Icons.source, size: 16, color: AppTheme.textSecondary),
+                    const Icon(
+                      Icons.source,
+                      size: 16,
+                      color: AppTheme.textSecondary,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         widget.app.repositoryUrl ?? 'No repository URL',
-                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -245,21 +331,34 @@ class _AppDetailPageState extends ConsumerState<AppDetailPage> with SingleTicker
         ],
       ),
       floatingActionButton: workflowsAsync.when(
-        data: (workflows) => FloatingActionButton.extended(
-          onPressed: _isTriggering ? null : () => _showTriggerMenu(workflows),
-          backgroundColor: AppTheme.primary,
-          icon: _isTriggering
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                )
-              : const Icon(Icons.local_fire_department_rounded, color: Colors.white),
-          label: const Text(
-            'Start Build',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-        ).animate().scale(),
+        data:
+            (workflows) =>
+                FloatingActionButton.extended(
+                  onPressed:
+                      _isTriggering ? null : () => _showTriggerMenu(workflows),
+                  backgroundColor: AppTheme.primary,
+                  icon:
+                      _isTriggering
+                          ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                          : const Icon(
+                            Icons.local_fire_department_rounded,
+                            color: Colors.white,
+                          ),
+                  label: const Text(
+                    'Start Build',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ).animate().scale(),
         loading: () => const SizedBox.shrink(),
         error: (e, _) => const SizedBox.shrink(),
       ),
@@ -299,13 +398,19 @@ class _BuildsTabState extends ConsumerState<_BuildsTab> {
   Widget build(BuildContext context) {
     final buildsAsync = ref.watch(buildsProvider(widget.app.id));
     final workflowsAsync = ref.watch(workflowsProvider(widget.app.id));
-    final wfNames = workflowsAsync.valueOrNull
-        ?.fold<Map<String, String>>({}, (map, wf) => map..[wf.id] = wf.name) ?? {};
+    final wfNames =
+        workflowsAsync.valueOrNull?.fold<Map<String, String>>(
+          {},
+          (map, wf) => map..[wf.id] = wf.name,
+        ) ??
+        {};
 
     // Start/stop polling based on whether any build is running
     buildsAsync.whenData((builds) {
       final hasRunning = builds.any((b) => b.isRunning);
-      WidgetsBinding.instance.addPostFrameCallback((_) => _schedulePoll(hasRunning));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _schedulePoll(hasRunning),
+      );
     });
 
     return RefreshIndicator(
@@ -323,39 +428,52 @@ class _BuildsTabState extends ConsumerState<_BuildsTab> {
             itemCount: builds.length,
             itemBuilder: (context, index) {
               final b = builds[index];
-              final displayName = b.fileWorkflowId?.isNotEmpty == true
-                  ? b.fileWorkflowId!
-                  : wfNames[b.workflowId] ?? b.workflowName;
+              final displayName =
+                  b.fileWorkflowId?.isNotEmpty == true
+                      ? b.fileWorkflowId!
+                      : wfNames[b.workflowId] ?? b.workflowName;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _BuildItem(
-                  item: b,
-                  displayName: displayName,
-                  onTap: () => BuildDetailSheet.show(
-                    context,
-                    b,
-                    workflowDisplayName: displayName,
-                    onCanceled: () => ref.invalidate(buildsProvider(widget.app.id)),
-                  ),
-                ).animate().fadeIn(delay: (40 * index).ms).slideX(begin: 0.05, end: 0),
+                      item: b,
+                      displayName: displayName,
+                      onTap:
+                          () => BuildDetailSheet.show(
+                            context,
+                            b,
+                            workflowDisplayName: displayName,
+                            onCanceled:
+                                () => ref.invalidate(
+                                  buildsProvider(widget.app.id),
+                                ),
+                          ),
+                    )
+                    .animate()
+                    .fadeIn(delay: (40 * index).ms)
+                    .slideX(begin: 0.05, end: 0),
               );
             },
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Error: $e', style: const TextStyle(color: AppTheme.error)),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(buildsProvider(widget.app.id)),
-                child: const Text('Retry'),
+        error:
+            (e, _) => Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Error: $e',
+                    style: const TextStyle(color: AppTheme.error),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed:
+                        () => ref.invalidate(buildsProvider(widget.app.id)),
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
       ),
     );
   }
@@ -399,7 +517,10 @@ class _BuildItem extends StatelessWidget {
                 SizedBox(
                   width: 24,
                   height: 24,
-                  child: CircularProgressIndicator(color: statusColor, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    color: statusColor,
+                    strokeWidth: 2,
+                  ),
                 )
               else
                 Icon(statusIcon, color: statusColor, size: 28),
@@ -413,45 +534,75 @@ class _BuildItem extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            displayName.isNotEmpty ? displayName : item.workflowId,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            displayName.isNotEmpty
+                                ? displayName
+                                : item.workflowId,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Text(
                           '#${item.buildNumber ?? '?'}',
-                          style: const TextStyle(color: AppTheme.textMuted, fontWeight: FontWeight.w600, fontSize: 13),
+                          style: const TextStyle(
+                            color: AppTheme.textMuted,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       item.commitMessage ?? 'No commit message',
-                      style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 13,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.call_split, size: 13, color: AppTheme.textMuted),
+                        const Icon(
+                          Icons.call_split,
+                          size: 13,
+                          color: AppTheme.textMuted,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           item.branch ?? 'unknown',
-                          style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textMuted,
+                          ),
                         ),
                         const Spacer(),
                         if (item.startedAt != null) ...[
-                          const Icon(Icons.access_time, size: 13, color: AppTheme.textMuted),
+                          const Icon(
+                            Icons.access_time,
+                            size: 13,
+                            color: AppTheme.textMuted,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             timeago.format(item.startedAt!),
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textMuted,
+                            ),
                           ),
                         ],
                         const SizedBox(width: 4),
-                        const Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+                        const Icon(
+                          Icons.chevron_right,
+                          size: 16,
+                          color: AppTheme.textMuted,
+                        ),
                       ],
                     ),
                   ],
@@ -478,28 +629,33 @@ class _StatsTab extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(buildStatsProvider(app.id)),
       child: statsAsync.when(
-        data: (stats) => ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-          children: [
-            _StatCard(stats: stats).animate().fadeIn(),
-            const SizedBox(height: 16),
-            _StatsGrid(stats: stats).animate().fadeIn(delay: 100.ms),
-          ],
-        ),
+        data:
+            (stats) => ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              children: [
+                _StatCard(stats: stats).animate().fadeIn(),
+                const SizedBox(height: 16),
+                _StatsGrid(stats: stats).animate().fadeIn(delay: 100.ms),
+              ],
+            ),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Error: $e', style: const TextStyle(color: AppTheme.error)),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(buildStatsProvider(app.id)),
-                child: const Text('Retry'),
+        error:
+            (e, _) => Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Error: $e',
+                    style: const TextStyle(color: AppTheme.error),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () => ref.invalidate(buildStatsProvider(app.id)),
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
       ),
     );
   }
@@ -522,40 +678,64 @@ class _StatCard extends StatelessWidget {
 
     final sections = <PieChartSectionData>[];
     if (stats.succeeded > 0) {
-      sections.add(PieChartSectionData(
-        value: stats.succeeded.toDouble(),
-        color: AppTheme.success,
-        title: '${stats.succeeded}',
-        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-        radius: 60,
-      ));
+      sections.add(
+        PieChartSectionData(
+          value: stats.succeeded.toDouble(),
+          color: AppTheme.success,
+          title: '${stats.succeeded}',
+          titleStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          radius: 60,
+        ),
+      );
     }
     if (stats.failed > 0) {
-      sections.add(PieChartSectionData(
-        value: stats.failed.toDouble(),
-        color: AppTheme.error,
-        title: '${stats.failed}',
-        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-        radius: 60,
-      ));
+      sections.add(
+        PieChartSectionData(
+          value: stats.failed.toDouble(),
+          color: AppTheme.error,
+          title: '${stats.failed}',
+          titleStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          radius: 60,
+        ),
+      );
     }
     if (stats.running > 0) {
-      sections.add(PieChartSectionData(
-        value: stats.running.toDouble(),
-        color: AppTheme.warning,
-        title: '${stats.running}',
-        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-        radius: 60,
-      ));
+      sections.add(
+        PieChartSectionData(
+          value: stats.running.toDouble(),
+          color: AppTheme.warning,
+          title: '${stats.running}',
+          titleStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          radius: 60,
+        ),
+      );
     }
     if (stats.canceled > 0) {
-      sections.add(PieChartSectionData(
-        value: stats.canceled.toDouble(),
-        color: AppTheme.textMuted,
-        title: '${stats.canceled}',
-        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-        radius: 60,
-      ));
+      sections.add(
+        PieChartSectionData(
+          value: stats.canceled.toDouble(),
+          color: AppTheme.textMuted,
+          title: '${stats.canceled}',
+          titleStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          radius: 60,
+        ),
+      );
     }
 
     final successPct = (stats.successRate * 100).toStringAsFixed(1);
@@ -575,7 +755,10 @@ class _StatCard extends StatelessWidget {
                 ),
                 Text(
                   'Last ${stats.total} builds',
-                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -598,15 +781,34 @@ class _StatCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _Legend(color: AppTheme.success, label: 'Success', count: stats.succeeded),
-                      _Legend(color: AppTheme.error, label: 'Failed', count: stats.failed),
-                      _Legend(color: AppTheme.warning, label: 'Running', count: stats.running),
-                      _Legend(color: AppTheme.textMuted, label: 'Canceled', count: stats.canceled),
+                      _Legend(
+                        color: AppTheme.success,
+                        label: 'Success',
+                        count: stats.succeeded,
+                      ),
+                      _Legend(
+                        color: AppTheme.error,
+                        label: 'Failed',
+                        count: stats.failed,
+                      ),
+                      _Legend(
+                        color: AppTheme.warning,
+                        label: 'Running',
+                        count: stats.running,
+                      ),
+                      _Legend(
+                        color: AppTheme.textMuted,
+                        label: 'Canceled',
+                        count: stats.canceled,
+                      ),
                       const Divider(height: 20),
                       Text(
                         '$successPct% success rate',
                         style: TextStyle(
-                          color: stats.successRate >= 0.8 ? AppTheme.success : AppTheme.warning,
+                          color:
+                              stats.successRate >= 0.8
+                                  ? AppTheme.success
+                                  : AppTheme.warning,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -627,7 +829,11 @@ class _Legend extends StatelessWidget {
   final Color color;
   final String label;
   final int count;
-  const _Legend({required this.color, required this.label, required this.count});
+  const _Legend({
+    required this.color,
+    required this.label,
+    required this.count,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -635,10 +841,25 @@ class _Legend extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 8),
-          Expanded(child: Text(label, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13))),
-          Text('$count', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Text(
+            '$count',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
         ],
       ),
     );
@@ -659,15 +880,30 @@ class _StatsGrid extends StatelessWidget {
       mainAxisSpacing: 12,
       childAspectRatio: 1.6,
       children: [
-        _StatTile(label: 'Total Builds', value: '${stats.total}', icon: Icons.build, color: AppTheme.primary),
+        _StatTile(
+          label: 'Total Builds',
+          value: '${stats.total}',
+          icon: Icons.build,
+          color: AppTheme.primary,
+        ),
         _StatTile(
           label: 'Success Rate',
           value: '${(stats.successRate * 100).toStringAsFixed(0)}%',
           icon: Icons.trending_up,
           color: stats.successRate >= 0.8 ? AppTheme.success : AppTheme.warning,
         ),
-        _StatTile(label: 'Succeeded', value: '${stats.succeeded}', icon: Icons.check_circle, color: AppTheme.success),
-        _StatTile(label: 'Failed', value: '${stats.failed}', icon: Icons.error, color: AppTheme.error),
+        _StatTile(
+          label: 'Succeeded',
+          value: '${stats.succeeded}',
+          icon: Icons.check_circle,
+          color: AppTheme.success,
+        ),
+        _StatTile(
+          label: 'Failed',
+          value: '${stats.failed}',
+          icon: Icons.error,
+          color: AppTheme.error,
+        ),
       ],
     );
   }
@@ -678,7 +914,12 @@ class _StatTile extends StatelessWidget {
   final String value;
   final IconData icon;
   final Color color;
-  const _StatTile({required this.label, required this.value, required this.icon, required this.color});
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -691,12 +932,24 @@ class _StatTile extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 22),
             const SizedBox(height: 8),
-            Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
-            Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
-
