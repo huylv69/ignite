@@ -75,7 +75,13 @@ Verified by hand against the live API. Getting these wrong is silent:
 - **`GET /apps/:id/variables` returns a bare JSON array**, not an object — it
   needs a different decoder from every other endpoint.
 - **`GET /builds/:id/step/:stepId` returns `text/plain`**, not JSON. It is the
-  only way to read build logs; there is no whole-build log endpoint.
+  only way to read build logs; there is no whole-build log endpoint. **It sends
+  no CORS headers**, unlike `/apps` and `/builds`, so browsers cannot read it —
+  step logs work on mobile and desktop only, and the web build says so instead
+  of surfacing a fetch error. **It sends
+  no CORS headers**, unlike `/apps` and `/builds`, so browsers cannot read it —
+  step logs work on mobile and desktop only, and the web build says so instead
+  of showing a fetch error.
 - Builds age out of `GET /builds` but stay readable via `GET /builds/:id`. An
   empty Builds tab does not mean the app never built.
 - Artefacts use the British spelling `artefacts`, and their `path` field is the

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -106,28 +107,51 @@ class StepLogPage extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.error_outline,
-                      color: AppTheme.error,
+                    Icon(
+                      kIsWeb ? Icons.public_off_rounded : Icons.error_outline,
+                      color: kIsWeb ? AppTheme.textMuted : AppTheme.error,
                       size: 40,
                     ),
                     const SizedBox(height: 12),
+                    // The step-log endpoint sends no CORS headers, unlike the
+                    // rest of the API, so a browser can never read it. Saying
+                    // that is more use than showing the raw exception.
                     Text(
-                      'Could not load this log.\n$e',
+                      kIsWeb
+                          ? 'Step logs are not available on the web.'
+                          : 'Could not load this log.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppTheme.error,
-                        fontSize: 13,
+                      style: TextStyle(
+                        color: kIsWeb ? AppTheme.textPrimary : AppTheme.error,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed:
-                          () => ref.invalidate(
-                            stepLogProvider(StepLogRef(buildId, step.id)),
-                          ),
-                      child: const Text('Retry'),
+                    const SizedBox(height: 8),
+                    Text(
+                      kIsWeb
+                          ? "Codemagic's log endpoint does not allow browser "
+                              'requests. Open this build in the Codemagic '
+                              'console, or use the Android, iOS or desktop '
+                              'build of Ignite.'
+                          : '$e',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
                     ),
+                    if (!kIsWeb) ...[
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed:
+                            () => ref.invalidate(
+                              stepLogProvider(StepLogRef(buildId, step.id)),
+                            ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
                   ],
                 ),
               ),

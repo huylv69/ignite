@@ -44,12 +44,17 @@ class _AppsPageState extends ConsumerState<AppsPage> {
         child: CustomScrollView(
           slivers: [
             SliverAppBar(
-              expandedHeight: 120,
+              // 120 for the branded header plus the 56 the search field below
+              // it occupies, otherwise the title collides with the search bar.
+              expandedHeight: 176,
               floating: false,
               pinned: true,
               backgroundColor: AppTheme.bg,
               flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                // The bottom 72 clears the 56pt search field plus its 16pt gap; a
+                // FlexibleSpaceBar measures its title from the very bottom of
+                // the app bar, `bottom` widget included.
+                titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 72),
                 title: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
