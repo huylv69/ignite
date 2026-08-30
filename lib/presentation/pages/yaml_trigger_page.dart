@@ -66,8 +66,22 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
   String? _loadingBranch; // guard against stale responses
   bool _isTriggering = false;
 
+  /// The API accepts a branch or a tag, never both.
+  bool _useTag = false;
+  String? _instanceType;
+
   final _addController = TextEditingController();
+  final _tagController = TextEditingController();
   bool _showAddField = false;
+
+  /// Machine types Codemagic exposes. A null selection lets the workflow's own
+  /// configuration decide.
+  static const _instanceTypes = <String>[
+    'mac_mini_m1',
+    'mac_mini_m2',
+    'linux_x2',
+    'windows_x2',
+  ];
 
   @override
   void initState() {
@@ -79,6 +93,7 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
   @override
   void dispose() {
     _addController.dispose();
+    _tagController.dispose();
     super.dispose();
   }
 
@@ -220,15 +235,20 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
     try {
       final api = ref.read(codemagicApiProvider);
       if (api == null) return;
+      final tag = _tagController.text.trim();
+      final useTag = _useTag && tag.isNotEmpty;
       await api.triggerBuild(
         appId: widget.app.id,
         workflowId: _selected!.id,
-        branch: _branch,
+        branch: useTag ? null : _branch,
+        tag: useTag ? tag : null,
+        instanceType: _instanceType,
       );
       if (mounted) {
+        final target = useTag ? 'tag $tag' : _branch;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Build triggered: ${_selected!.id} @ $_branch'),
+            content: Text('Build triggered: ${_selected!.id} @ $target'),
             backgroundColor: AppTheme.success,
           ),
         );
@@ -255,58 +275,139 @@ class _YamlTriggerPageState extends ConsumerState<YamlTriggerPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Branch selector
+          // Branch / tag selector
           Container(
             color: AppTheme.bgCard,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            child: Column(
               children: [
-                const Icon(
-                  Icons.call_split,
-                  size: 15,
-                  color: AppTheme.textMuted,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Branch:',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value:
-                          widget.app.branches.contains(_branch)
-                              ? _branch
-                              : null,
-                      hint: Text(
-                        _branch,
-                        style: const TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 13,
+                Row(
+                  children: [
+                    SegmentedButton<bool>(
+                      showSelectedIcon: false,
+                      style: ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        textStyle: WidgetStatePropertyAll(
+                          const TextStyle(fontSize: 12),
                         ),
                       ),
-                      isDense: true,
-                      style: const TextStyle(
-                        color: AppTheme.textPrimary,
+                      segments: const [
+                        ButtonSegment(
+                          value: false,
+                          label: Text('Branch'),
+                          icon: Icon(Icons.call_split, size: 14),
+                        ),
+                        ButtonSegment(
+                          value: true,
+                          label: Text('Tag'),
+                          icon: Icon(Icons.sell_outlined, size: 14),
+                        ),
+                      ],
+                      selected: {_useTag},
+                      onSelectionChanged:
+                          (v) => setState(() => _useTag = v.first),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child:
+                          _useTag
+                              ? TextField(
+                                controller: _tagController,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  hintText: 'v1.0.0',
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                ),
+                              )
+                              : DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value:
+                                      widget.app.branches.contains(_branch)
+                                          ? _branch
+                                          : null,
+                                  hint: Text(
+                                    _branch,
+                                    style: const TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  isDense: true,
+                                  isExpanded: true,
+                                  style: const TextStyle(
+                                    color: AppTheme.textPrimary,
+                                    fontSize: 13,
+                                  ),
+                                  dropdownColor: AppTheme.bgElevated,
+                                  items:
+                                      widget.app.branches
+                                          .map(
+                                            (b) => DropdownMenuItem(
+                                              value: b,
+                                              child: Text(b),
+                                            ),
+                                          )
+                                          .toList(),
+                                  onChanged: (b) {
+                                    if (b != null) {
+                                      setState(() => _branch = b);
+                                      _loadWorkflows();
+                                    }
+                                  },
+                                ),
+                              ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.memory_rounded,
+                      size: 15,
+                      color: AppTheme.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Machine:',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
                         fontSize: 13,
                       ),
-                      dropdownColor: AppTheme.bgElevated,
-                      items:
-                          widget.app.branches
-                              .map(
-                                (b) =>
-                                    DropdownMenuItem(value: b, child: Text(b)),
-                              )
-                              .toList(),
-                      onChanged: (b) {
-                        if (b != null) {
-                          setState(() => _branch = b);
-                          _loadWorkflows();
-                        }
-                      },
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          value: _instanceType,
+                          isDense: true,
+                          isExpanded: true,
+                          dropdownColor: AppTheme.bgElevated,
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 13,
+                          ),
+                          items: [
+                            const DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('Workflow default'),
+                            ),
+                            ..._instanceTypes.map(
+                              (t) => DropdownMenuItem<String?>(
+                                value: t,
+                                child: Text(t),
+                              ),
+                            ),
+                          ],
+                          onChanged: (t) => setState(() => _instanceType = t),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
