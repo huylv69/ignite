@@ -46,6 +46,19 @@ ZSIGN="$WORK/zsign"; chmod +x "$ZSIGN"
 printf '%s' "$IOS_P12_B64" | base64 --decode > "$WORK/cert.p12"
 printf '%s' "$IOS_PROVISION_B64" | base64 --decode > "$WORK/cert.mobileprovision"
 
+# The manifest's bundle id must be the one inside the .ipa, or iOS refuses the
+# install. Read it from the app instead of trusting BUNDLE_ID: Atlas ships as
+# tech.huylv.atlasApp while its store listing says tech.huylv.atlas.
+IPA_BUNDLE_ID="$(python3 - "$IPA_PATH" <<'PY'
+import plistlib, re, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+name = next(n for n in z.namelist() if re.fullmatch(r'Payload/[^/]+\.app/Info\.plist', n))
+print(plistlib.loads(z.read(name))['CFBundleIdentifier'])
+PY
+)"
+[ "$IPA_BUNDLE_ID" = "$BUNDLE_ID" ] || echo "  bundle id from the ipa: $IPA_BUNDLE_ID (BUNDLE_ID says $BUNDLE_ID)"
+BUNDLE_ID="$IPA_BUNDLE_ID"
+
 echo "→ sign $IPA_PATH"
 SIGNED="$WORK/$APP_SLUG-$VER.ipa"
 "$ZSIGN" -C -k "$WORK/cert.p12" -p "$IOS_P12_PASSWORD" -m "$WORK/cert.mobileprovision" \
