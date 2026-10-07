@@ -8,6 +8,7 @@ import '../../core/models/app_model.dart';
 import '../../core/providers/accounts_provider.dart';
 import '../../core/providers/codemagic_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../ota_update.dart';
 
 /// Lets the signed-in accounts be switched, renamed, removed, or added to.
 ///
@@ -69,6 +70,7 @@ class AccountSheet extends ConsumerWidget {
                 onRemove: () => _remove(context, ref, a),
               ),
             ),
+            const OtaUpdateTile(),
             const Divider(color: AppTheme.border, height: 24),
             ListTile(
               leading: Container(
