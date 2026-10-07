@@ -14,6 +14,7 @@ import 'presentation/pages/login_page.dart';
 import 'presentation/pages/lock_page.dart';
 import 'presentation/pages/apps_page.dart';
 import 'presentation/pages/app_detail_page.dart';
+import 'ota_update.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -119,6 +120,12 @@ class CodemagicAdminApp extends ConsumerWidget {
       themeMode: ThemeMode.dark,
       routerConfig: router,
       scaffoldMessengerKey: _messengerKey,
+      builder:
+          (context, child) => OtaGate(
+            slug: 'ignite',
+            bundleId: 'tech.huylv.ignite',
+            child: child!,
+          ),
     );
   }
 }

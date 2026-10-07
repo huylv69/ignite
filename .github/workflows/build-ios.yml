@@ -81,6 +81,7 @@ jobs:
       - name: Build iOS
         run: flutter build ios --release --no-codesign
           --build-name=$APP_VERSION --build-number=$BUILD_NUMBER
+          --dart-define=APP_VERSION=$APP_VERSION
 
       - name: Package IPA
         run: |
@@ -110,6 +111,30 @@ jobs:
             echo "NC secrets not set — skipping store publish."; exit 0
           fi
           bash ci/update_store.sh
+
+      # Signed build for one-tap install (itms-services); the app offers it via
+      # OtaGate. Skips quietly until the signing secrets exist.
+      - name: Sign + publish OTA
+        continue-on-error: true
+        env:
+          NC_USER: ${{ secrets.NC_USER }}
+          NC_APP_PASSWORD: ${{ secrets.NC_APP_PASSWORD }}
+          IOS_P12_B64: ${{ secrets.IOS_P12_B64 }}
+          IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+          IOS_PROVISION_B64: ${{ secrets.IOS_PROVISION_B64 }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          APP_SLUG: ignite
+          APP_NAME: Ignite
+          BUNDLE_ID: tech.huylv.ignite
+          VER: ${{ env.APP_VERSION }}
+          IPA_PATH: ignite.ipa
+          SHARE_TOKEN: AKH743YcoJRnBHa
+        run: |
+          if [ -z "$IOS_P12_B64" ] || [ -z "$NC_USER" ]; then
+            echo "signing or NC secrets not set — skipping OTA."; exit 0
+          fi
+          bash ci/ota_publish.sh
 
       - name: Upload IPA (artifact fallback)
         uses: actions/upload-artifact@v4
